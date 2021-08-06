@@ -1,0 +1,4 @@
+lxml
+pdf2image
+tqdm 
+Pillow
