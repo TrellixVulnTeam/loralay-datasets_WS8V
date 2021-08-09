@@ -1,19 +1,22 @@
 
 import argparse
+import time
 import os
 import shutil
 import subprocess
 import re
-import json
+import xml.etree.ElementTree as ET
+import urllib.request 
 from tqdm import tqdm
-from utils import get_ids
+from utils import get_abstracts, get_ids
 
+
+def matches_first_id_scheme(id):
+    p = re.compile("^([a-z\-]*)(\d{7})$")
+    m = p.match(id)
+    return m
 
 def extract_pdf(arxiv_id, pdf_output_path):
-    def matches_first_id_scheme(id):
-        p = re.compile("^([a-z\-]*)(\d{7})$")
-        m = p.match(id)
-        return m
     m = matches_first_id_scheme(arxiv_id)
     if m:
         command = "gsutil cp gs://arxiv-dataset/arxiv/" \
@@ -33,50 +36,71 @@ def extract_pdf(arxiv_id, pdf_output_path):
         return True 
     return False
 
+def extract_abstract(url):
+    response = urllib.request.urlopen(url).read()
+    tree = ET.fromstring(response)
+    if not tree:
+        return None 
+    print(url)    
+    node = tree.find(
+        ".//pns:metadata", 
+        namespaces={"pns": "http://www.openarchives.org/OAI/2.0/"}
+    ).getchildren()[0]
+    if not node:
+        return None
+    
+    abstract_text = node.find(
+        "./pns:abstract", 
+        namespaces={"pns": "http://arxiv.org/OAI/arXiv/"}
+    ).text
+
+    return abstract_text
+
+
 def extract(args):
     id_list = get_ids(args.input_file, args.n_docs)
-    id_list_extracted = []
+    id_failed = []
+    start = time.time()
 
     for arxiv_id in id_list:
         pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
         pdf_extracted = extract_pdf(arxiv_id, pdf_output_path)
-        if pdf_extracted:
-            id_list_extracted.append(arxiv_id)
+
+        m = matches_first_id_scheme(arxiv_id)
+        if m:
+            url = f"http://export.arxiv.org/oai2?verb=GetRecord&identifier=oai:arXiv.org:{m.group(1)}/{m.group(2)}&metadataPrefix=arXiv"
         else:
-            print(f"Could not extract PDF file for article {arxiv_id}")
+            url = f"http://export.arxiv.org/oai2?verb=GetRecord&identifier=oai:arXiv.org:{arxiv_id}&metadataPrefix=arXiv"
+        abstract_text = extract_abstract(url)
 
-    remaining_ids = id_list_extracted
-    with open(args.metadata_file, "r") as f:
-        for line in tqdm(f):
-            metadata = json.loads(line)
-            if metadata["id"] in remaining_ids:
+        if abstract_text: 
+            if pdf_extracted: # abstract and pdf exist: save abstract
                 with open(
-                    os.path.join(args.abstract_output_dir, metadata["id"] + ".txt"),
-                    "w"
+                    os.path.join(args.abstract_output_dir, arxiv_id + ".txt"), "w"
                 ) as fw:
-                    abstract_words = metadata["abstract"].split()
+                    abstract_words = abstract_text.strip().split()
                     for w in abstract_words:
-                        fw.write(w.replace("\n", " ") + "\n")
-                remaining_ids.remove(metadata["id"])
-                if not remaining_ids:
-                    break 
+                        fw.write(w + "\n")
+            else: 
+                id_failed.append((arxiv_id, 'pdf'))
+        else:
+            id_failed.append((arxiv_id, 'abstract'))
+            if pdf_extracted: # pdf has been extracted, delete it
+                os.remove(pdf_output_path)
 
-    if remaining_ids:
-        for arxiv_id in remaining_ids:
-            pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
-            print(f"Abstract not found for article {arxiv_id}: deleting {pdf_output_path}")
-            os.path.remove(pdf_output_path)
+        
+
+    if id_failed:
+        print(f"Failed to retrieve:")
+        for arxiv_id, reason in id_failed:
+            print(f"\t{arxiv_id} ({reason})")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
         "--input_file", 
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "--metadata_file", 
         type=str,
         required=True,
     )

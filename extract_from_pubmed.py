@@ -73,7 +73,7 @@ def extract(args):
                 with open(
                     os.path.join(args.abstract_output_dir, pmcid + ".txt"), "w"
                 ) as fw:
-                    abstract_words = abstract_text.split()
+                    abstract_words = abstract_text.strip().split()
                     for w in abstract_words:
                         fw.write(w + "\n")
             else: 
