@@ -88,8 +88,6 @@ def remove_downloaded_from_id_list(args, id_list):
 
 def extract(args):
     id_list = get_ids(args.input_file, args.n_docs)
-    id_failed = []
-    id_successed = []
 
     if args.resume_download:
         id_list = remove_downloaded_from_id_list(args, id_list)
@@ -99,6 +97,8 @@ def extract(args):
     start = None
 
     for arxiv_id in id_list:
+        failed_extraction = False
+
         pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
         pdf_extracted = extract_pdf(arxiv_id, pdf_output_path)
 
@@ -126,25 +126,20 @@ def extract(args):
                     abstract_words = abstract_text.strip().split()
                     for w in abstract_words:
                         fw.write(w + "\n")
-                id_successed.append(arxiv_id)
             else: 
-                id_failed.append((arxiv_id, 'pdf'))
+                failed_extraction = True
         else:
-            id_failed.append((arxiv_id, 'abstract'))
+            failed_extraction = True
             if pdf_extracted: # pdf has been extracted, delete it
                 os.remove(pdf_output_path)
         
-    mode = "a" if args.resume_download else "w"
-    with open(args.downloaded_output_file, mode) as f:
-        for arxiv_id in id_successed:
-            f.write(arxiv_id + "\n")
-    print(f"Downloaded files listed in {args.downloaded_output_file}")
-
-    if id_failed:
-        print("Failed to extract following files: ", id_failed)
-        with open(args.failed_output_file, mode) as f:
-            for arxiv_id in id_failed:
-                f.write(arxiv_id[0] + "\n")
+    
+        if failed_extraction:
+            with open(args.failed_output_file, "a") as f:
+                f.write(arxiv_id + "\n")
+        else:
+            with open(args.downloaded_output_file, "a") as f:
+                f.write(arxiv_id + "\n")
 
 
 if __name__ == "__main__":
@@ -206,6 +201,12 @@ if __name__ == "__main__":
             print(f"Overwriting {args.abstract_output_dir}")
             shutil.rmtree(args.abstract_output_dir)
             os.makedirs(args.abstract_output_dir)
+
+            print(f"Overwriting {args.downloaded_output_file}")
+            os.remove(args.downloaded_output_file)
+            if os.path.isfile(args.failed_output_file):
+                print(f"Overwriting {args.failed_output_file}")
+                os.remove(args.failed_output_file)
         else:
             if os.listdir(args.pdf_output_dir):
                 raise ValueError(
@@ -214,6 +215,14 @@ if __name__ == "__main__":
             if os.listdir(args.abstract_output_dir):
                 raise ValueError(
                     f"Output directory ({args.abstract_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
+                )
+            if os.path.isfile(args.downloaded_output_file):
+                raise ValueError(
+                    f"Output file ({args.downloaded_output_file}) already exists. Use --overwrite_output_dir to overcome."
+                )
+            if os.path.isfile(args.failed_output_file):
+                raise ValueError(
+                    f"Output file ({args.failed_output_file}) already exists. Use --overwrite_output_dir to overcome."
                 )
 
     extract(args)
