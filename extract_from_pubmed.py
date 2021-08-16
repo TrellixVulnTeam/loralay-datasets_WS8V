@@ -8,6 +8,14 @@ import urllib.request
 from utils import get_ids
 
 def extract_abstract(url):
+    """ Extract abstract using the BioC API
+
+    Args:
+        url (string): URL of article abstract in BioC XML format
+
+    Returns:
+        string: Abstract text 
+    """
     response = urllib.request.urlopen(url).read()
     tree = ET.fromstring(response)
     abstract_nodes = tree.findall(".//passage[infon = 'ABSTRACT']/text")
@@ -18,6 +26,15 @@ def extract_abstract(url):
         return abstract_text
 
 def extract_pdf_from_pdf_url(url, output_path):
+    """ Extract PDF based on FTP link (https://www.ncbi.nlm.nih.gov/pmc/tools/ftp/)
+
+    Args:
+        url (string): FTP link to PDF 
+        output_path (string): Path to output PDF file
+
+    Returns:
+        bool: True if extraction was successful, False otherwise
+    """
     command = f"wget -O {output_path} {url}"
     subprocess.call(command, shell=True)
     
@@ -26,6 +43,16 @@ def extract_pdf_from_pdf_url(url, output_path):
     return False 
 
 def extract_pdf_from_tar_url(url, output_path, tar_path):
+    """ Extract PDF from tar archive 
+
+    Args:
+        url (string): FTP link to tar archive containing PDF
+        output_path (string): Path to output PDF file
+        tar_path (string): Path to tar archive
+
+    Returns:
+        bool: True if extraction was successful, False otherwise
+    """
     command = f"wget -O {tar_path} {url}"
     subprocess.call(command, shell=True)
 
@@ -40,7 +67,15 @@ def extract_pdf_from_tar_url(url, output_path, tar_path):
         return True 
     return False 
 
-def find_ft_url(oa_url):
+def find_ftp_url(oa_url):
+    """ Extract FTP URL from PMC OA URL (https://www.ncbi.nlm.nih.gov/pmc/tools/ftp/)
+
+    Args:
+        oa_url (string): OA URL providing the article location on the FTP site 
+
+    Returns:
+        string: link to the article (PDF or tar) location on the FTP site
+    """
     response = urllib.request.urlopen(oa_url).read()
     tree = ET.fromstring(response)
 
@@ -50,19 +85,47 @@ def find_ft_url(oa_url):
     else:
         return links[0].get("href")
 
+def remove_downloaded_from_id_list(args, id_list):
+    """ Remove already downloaded articles and articles that could not be downloaded
+
+    Args:
+        args (Namespace): command line arguments
+        id_list (list): list of PMCIDs  
+
+    Returns:
+        list: list of PMCIDs whose articles have not been downloaded yet
+    """
+    with open(args.failed_output_file, "r") as f:
+        failed_to_download = f.read().splitlines()
+
+    id_list = [
+        pmcid for pmcid in id_list if (
+            pmcid not in failed_to_download and (
+                not os.path.isfile(os.path.join(args.pdf_output_dir, pmcid + ".pdf"))
+            )
+        )
+    ] # remove pmcids whose articles could not be downloaded or whose have already been downloaded
+    return id_list
+
 def extract(args):
     id_list = get_ids(args.input_file, args.n_docs)
+
+    if args.resume_download:
+        id_list = remove_downloaded_from_id_list(args, id_list)
+
+    print(f"Extracting {len(id_list)} articles from PubMed")
+
     id_failed = []
     for pmcid in id_list:
         oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
-        ft_url = find_ft_url(oa_url)
+        ftp_url = find_ftp_url(oa_url)
         output_path = os.path.join(args.pdf_output_dir, pmcid + ".pdf")
-        if ".pdf" in ft_url:
-            pdf_extracted = extract_pdf_from_pdf_url(ft_url, output_path)
+        if ".pdf" in ftp_url:
+            pdf_extracted = extract_pdf_from_pdf_url(ftp_url, output_path)
         else:
             tar_path = os.path.join(args.tmp_output_dir, pmcid + ".tar.gz")
 
-            pdf_extracted = extract_pdf_from_tar_url(ft_url, output_path, tar_path)
+            pdf_extracted = extract_pdf_from_tar_url(ftp_url, output_path, tar_path)
         
         abstract_text = extract_abstract(
             f"https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_xml/{pmcid}/unicode"
@@ -85,6 +148,10 @@ def extract(args):
 
     if id_failed:
         print("Failed to extract following files: ", id_failed)
+        mode = "a" if args.resume_download else "w"
+        with open(args.failed_output_file, mode) as f:
+            for pmcid in id_failed:
+                f.write(pmcid[0] + "\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -110,9 +177,19 @@ if __name__ == "__main__":
         default="./tmp",
     )
     parser.add_argument(
+        "--failed_output_file",
+        type=str,
+        default="./failed_to_download.txt"
+    )
+    parser.add_argument(
         "--n_docs",
         type=int,
         default=5,
+    )
+    parser.add_argument(
+        "--resume_download",
+        action="store_true", 
+        help="Resume download."
     )
     parser.add_argument(
         "--overwrite_output_dir", 
@@ -122,14 +199,31 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if os.listdir(args.pdf_output_dir):
+    if args.resume_download and args.overwrite_output_dir:
+        raise ValueError(
+            f"Cannot use --resume_download and --overwrite_output_dir at the same time."
+        )
+
+    if os.listdir(args.pdf_output_dir) and not args.resume_download:
         if args.overwrite_output_dir:
-            print(f"Overwriting {args.pdf_output_dir}")
-            shutil.rmtree(args.pdf_output_dir)
-            os.makedirs(args.pdf_output_dir)
+            for output_dir in [
+                args.pdf_output_dir, args.abstract_output_dir, args.tmp_output_dir
+            ]:
+                print(f"Overwriting {output_dir}")
+                shutil.rmtree(output_dir)
+                os.makedirs(output_dir)
         else:
-            raise ValueError(
-                f"Output directory ({args.pdf_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
-            )
+            if os.listdir(args.pdf_output_dir):
+                raise ValueError(
+                    f"Output directory ({args.pdf_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
+                )
+            if os.listdir(args.abstract_output_dir):
+                raise ValueError(
+                    f"Output directory ({args.abstract_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
+                )
+            if os.listdir(args.tmp_output_dir):
+                raise ValueError(
+                    f"Output directory ({args.tmp_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
+                )
 
     extract(args)

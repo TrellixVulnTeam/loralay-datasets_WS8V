@@ -56,11 +56,40 @@ def extract_abstract(url):
 
     return abstract_text
 
+def remove_downloaded_from_id_list(args, id_list):
+    """ Remove already downloaded articles and articles that could not be downloaded
+
+    Args:
+        args (Namespace): command line arguments
+        id_list (list): list of arXiv ids  
+
+    Returns:
+        list: list of arXiv ids whose articles have not been downloaded yet
+    """
+    if os.path.isfile(args.failed_output_file):
+        with open(args.failed_output_file, "r") as f:
+            failed_to_download = f.read().splitlines()
+    else:
+        failed_to_download = []
+
+    id_list = [
+        arxiv_id for arxiv_id in id_list if (
+            arxiv_id not in failed_to_download and (
+                not os.path.isfile(os.path.join(args.pdf_output_dir, arxiv_id + ".pdf"))
+            )
+        )
+    ] # remove pmcids whose articles could not be downloaded or whose have already been downloaded
+    return id_list
+
 
 def extract(args):
     id_list = get_ids(args.input_file, args.n_docs)
     id_failed = []
-    start = time.time()
+
+    if args.resume_download:
+        id_list = remove_downloaded_from_id_list(args, id_list)
+
+    print(f"Extracting {len(id_list)} articles from arXiv")
 
     for arxiv_id in id_list:
         pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
@@ -91,9 +120,11 @@ def extract(args):
         
 
     if id_failed:
-        print(f"Failed to retrieve:")
-        for arxiv_id, reason in id_failed:
-            print(f"\t{arxiv_id} ({reason})")
+        print("Failed to extract following files: ", id_failed)
+        mode = "a" if args.resume_download else "w"
+        with open(args.failed_output_file, mode) as f:
+            for arxiv_id in id_failed:
+                f.write(arxiv_id[0] + "\n")
 
 
 if __name__ == "__main__":
@@ -115,9 +146,19 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
+        "--failed_output_file",
+        type=str,
+        default="./failed_to_download.txt"
+    )
+    parser.add_argument(
         "--n_docs",
         type=int,
         default=5,
+    )
+    parser.add_argument(
+        "--resume_download",
+        action="store_true", 
+        help="Resume download."
     )
     parser.add_argument(
         "--overwrite_output_dir", 
@@ -127,7 +168,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if os.listdir(args.pdf_output_dir) or os.listdir(args.abstract_output_dir):
+    if args.resume_download and args.overwrite_output_dir:
+        raise ValueError(
+            f"Cannot use --resume_download and --overwrite_output_dir at the same time."
+        )
+
+    if (os.listdir(args.pdf_output_dir) or os.listdir(args.abstract_output_dir)) and not args.resume_download:
         if args.overwrite_output_dir:
             print(f"Overwriting {args.pdf_output_dir}")
             shutil.rmtree(args.pdf_output_dir)
