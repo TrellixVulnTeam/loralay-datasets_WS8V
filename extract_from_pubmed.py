@@ -95,14 +95,21 @@ def remove_downloaded_from_id_list(args, id_list):
     Returns:
         list: list of PMCIDs whose articles have not been downloaded yet
     """
-    with open(args.failed_output_file, "r") as f:
-        failed_to_download = f.read().splitlines()
+    if os.path.isfile(args.failed_output_file):
+        with open(args.failed_output_file, "r") as f:
+            failed_to_download = f.read().splitlines()
+    else:
+        failed_to_download = []
+
+    if os.path.isfile(args.downloaded_output_file):
+        with open(args.downloaded_output_file, "r") as f:
+            downloaded = f.read().splitlines()
+    else:
+        downloaded = []
 
     id_list = [
         pmcid for pmcid in id_list if (
-            pmcid not in failed_to_download and (
-                not os.path.isfile(os.path.join(args.pdf_output_dir, pmcid + ".pdf"))
-            )
+            pmcid not in failed_to_download and pmcid not in downloaded
         )
     ] # remove pmcids whose articles could not be downloaded or whose have already been downloaded
     return id_list
@@ -116,6 +123,7 @@ def extract(args):
     print(f"Extracting {len(id_list)} articles from PubMed")
 
     id_failed = []
+    id_successed = []
     for pmcid in id_list:
         oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
         ftp_url = find_ftp_url(oa_url)
@@ -139,6 +147,7 @@ def extract(args):
                     abstract_words = abstract_text.strip().split()
                     for w in abstract_words:
                         fw.write(w + "\n")
+                id_successed.append(pmcid)
             else: 
                 id_failed.append((pmcid, 'pdf'))
         else:
@@ -146,9 +155,14 @@ def extract(args):
             if pdf_extracted: # pdf has been extracted, delete it
                 os.remove(output_path)
 
+    mode = "a" if args.resume_download else "w"
+    with open(args.downloaded_output_file, mode) as f:
+        for pmcid in id_successed:
+            f.write(pmcid + "\n")
+    print(f"Downloaded files listed in {args.downloaded_output_file}")
+
     if id_failed:
         print("Failed to extract following files: ", id_failed)
-        mode = "a" if args.resume_download else "w"
         with open(args.failed_output_file, mode) as f:
             for pmcid in id_failed:
                 f.write(pmcid[0] + "\n")
@@ -175,6 +189,11 @@ if __name__ == "__main__":
         "--tmp_output_dir", 
         type=str,
         default="./tmp",
+    )
+    parser.add_argument(
+        "--downloaded_output_file",
+        type=str,
+        default="./downloaded.txt"
     )
     parser.add_argument(
         "--failed_output_file",

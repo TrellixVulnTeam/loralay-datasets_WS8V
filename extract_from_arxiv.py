@@ -72,11 +72,15 @@ def remove_downloaded_from_id_list(args, id_list):
     else:
         failed_to_download = []
 
+    if os.path.isfile(args.downloaded_output_file):
+        with open(args.downloaded_output_file, "r") as f:
+            downloaded = f.read().splitlines()
+    else:
+        downloaded = []
+
     id_list = [
         arxiv_id for arxiv_id in id_list if (
-            arxiv_id not in failed_to_download and (
-                not os.path.isfile(os.path.join(args.pdf_output_dir, arxiv_id + ".pdf"))
-            )
+            arxiv_id not in failed_to_download and arxiv_id not in downloaded
         )
     ] # remove pmcids whose articles could not be downloaded or whose have already been downloaded
     return id_list
@@ -85,11 +89,14 @@ def remove_downloaded_from_id_list(args, id_list):
 def extract(args):
     id_list = get_ids(args.input_file, args.n_docs)
     id_failed = []
+    id_successed = []
 
     if args.resume_download:
         id_list = remove_downloaded_from_id_list(args, id_list)
 
     print(f"Extracting {len(id_list)} articles from arXiv")
+
+    start = None
 
     for arxiv_id in id_list:
         pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
@@ -100,7 +107,16 @@ def extract(args):
             url = f"http://export.arxiv.org/oai2?verb=GetRecord&identifier=oai:arXiv.org:{m.group(1)}/{m.group(2)}&metadataPrefix=arXiv"
         else:
             url = f"http://export.arxiv.org/oai2?verb=GetRecord&identifier=oai:arXiv.org:{arxiv_id}&metadataPrefix=arXiv"
+        
+        
+        if start:
+            stop = time.time()
+            time_between_requests = stop - start 
+            if time_between_requests < 3:
+                time.sleep(3 - time_between_requests)
+
         abstract_text = extract_abstract(url)
+        start = time.time()
 
         if abstract_text: 
             if pdf_extracted: # abstract and pdf exist: save abstract
@@ -110,18 +126,22 @@ def extract(args):
                     abstract_words = abstract_text.strip().split()
                     for w in abstract_words:
                         fw.write(w + "\n")
+                id_successed.append(arxiv_id)
             else: 
                 id_failed.append((arxiv_id, 'pdf'))
         else:
             id_failed.append((arxiv_id, 'abstract'))
             if pdf_extracted: # pdf has been extracted, delete it
                 os.remove(pdf_output_path)
-
         
+    mode = "a" if args.resume_download else "w"
+    with open(args.downloaded_output_file, mode) as f:
+        for arxiv_id in id_successed:
+            f.write(arxiv_id + "\n")
+    print(f"Downloaded files listed in {args.downloaded_output_file}")
 
     if id_failed:
         print("Failed to extract following files: ", id_failed)
-        mode = "a" if args.resume_download else "w"
         with open(args.failed_output_file, mode) as f:
             for arxiv_id in id_failed:
                 f.write(arxiv_id[0] + "\n")
@@ -144,6 +164,11 @@ if __name__ == "__main__":
         "--abstract_output_dir", 
         type=str,
         required=True,
+    )
+    parser.add_argument(
+        "--downloaded_output_file",
+        type=str,
+        default="./downloaded.txt"
     )
     parser.add_argument(
         "--failed_output_file",
