@@ -95,14 +95,14 @@ def remove_downloaded_from_id_list(args, id_list):
     Returns:
         list: list of PMCIDs whose articles have not been downloaded yet
     """
-    if os.path.isfile(args.failed_output_file):
-        with open(args.failed_output_file, "r") as f:
+    if os.path.isfile(args.failed_output_log):
+        with open(args.failed_output_log, "r") as f:
             failed_to_download = f.read().splitlines()
     else:
         failed_to_download = []
 
-    if os.path.isfile(args.downloaded_output_file):
-        with open(args.downloaded_output_file, "r") as f:
+    if os.path.isfile(args.downloaded_output_log):
+        with open(args.downloaded_output_log, "r") as f:
             downloaded = f.read().splitlines()
     else:
         downloaded = []
@@ -145,9 +145,8 @@ def extract(args):
 
         if abstract_text: 
             if pdf_extracted: # abstract and pdf exist: save abstract
-                with open(
-                    os.path.join(args.abstract_output_dir, pmcid + ".txt"), "w"
-                ) as fw:
+                abstract_output_path = os.path.join(args.abstract_output_dir, pmcid + ".txt")
+                with open(abstract_output_path, "w") as fw:
                     abstract_words = abstract_text.strip().split()
                     for w in abstract_words:
                         fw.write(w + "\n")
@@ -159,10 +158,10 @@ def extract(args):
                 os.remove(output_path)
 
         if failed_extraction:
-            with open(args.failed_output_file, "a") as f:
+            with open(args.failed_output_log, "a") as f:
                 f.write(pmcid + "\n")
         else:
-            with open(args.downloaded_output_file, "a") as f:
+            with open(args.downloaded_output_log, "a") as f:
                 f.write(pmcid + "\n")
         
 
@@ -190,14 +189,14 @@ if __name__ == "__main__":
         default="./tmp",
     )
     parser.add_argument(
-        "--downloaded_output_file",
+        "--downloaded_output_log",
         type=str,
-        default="./downloaded.txt"
+        default="./downloaded.log"
     )
     parser.add_argument(
-        "--failed_output_file",
+        "--failed_output_log",
         type=str,
-        default="./failed_to_download.txt"
+        default="./failed_to_download.log"
     )
     parser.add_argument(
         "--n_docs",
@@ -231,10 +230,11 @@ if __name__ == "__main__":
                 shutil.rmtree(output_dir)
                 os.makedirs(output_dir)
 
-            print(f"Overwriting {args.downloaded_output_file}")
-            os.remove(args.downloaded_output_file)
-            print(f"Overwriting {args.failed_output_file}")
-            os.remove(args.failed_output_file)
+            print(f"Overwriting {args.downloaded_output_log}")
+            os.remove(args.downloaded_output_log)
+            if os.path.isfile(args.failed_output_log):
+                print(f"Overwriting {args.failed_output_log}")
+                os.remove(args.failed_output_log)
         else:
             if os.listdir(args.pdf_output_dir):
                 raise ValueError(
@@ -248,13 +248,13 @@ if __name__ == "__main__":
                 raise ValueError(
                     f"Output directory ({args.tmp_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
                 )
-            if os.path.isfile(args.downloaded_output_file):
+            if os.path.isfile(args.downloaded_output_log):
                 raise ValueError(
-                    f"Output file ({args.downloaded_output_file}) already exists. Use --overwrite_output_dir to overcome."
+                    f"Output file ({args.downloaded_output_log}) already exists. Use --overwrite_output_dir to overcome."
                 )
-            if os.path.isfile(args.failed_output_file):
+            if os.path.isfile(args.failed_output_log):
                 raise ValueError(
-                    f"Output file ({args.failed_output_file}) already exists. Use --overwrite_output_dir to overcome."
+                    f"Output file ({args.failed_output_log}) already exists. Use --overwrite_output_dir to overcome."
                 )
 
 
