@@ -8,7 +8,7 @@ import re
 import xml.etree.ElementTree as ET
 import urllib.request 
 from tqdm import tqdm
-from utils import get_abstracts, get_ids
+from utils import get_ids
 
 
 def matches_first_id_scheme(id):
