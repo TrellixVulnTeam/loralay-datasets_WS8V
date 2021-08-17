@@ -143,24 +143,22 @@ def extract(args):
             tar_path = os.path.join(args.tmp_output_dir, pmcid + ".tar.gz")
 
             pdf_extracted = extract_pdf_from_tar_url(ftp_url, output_path, tar_path)
-        
-        abstract_text = extract_abstract(
-            f"https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_xml/{pmcid}/unicode"
-        )
 
-        if abstract_text: 
-            if pdf_extracted: # abstract and pdf exist: save abstract
+        if pdf_extracted:
+            abstract_text = extract_abstract(
+                f"https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_xml/{pmcid}/unicode"
+            )
+            if abstract_text: 
                 abstract_output_path = os.path.join(args.abstract_output_dir, pmcid + ".txt")
                 with open(abstract_output_path, "w") as fw:
                     abstract_words = abstract_text.strip().split()
                     for w in abstract_words:
                         fw.write(w + "\n")
-            else: 
-                failed_extraction = True
+            else:
+                failed_extraction = True 
+                os.remove(output_path) # pdf has been extracted, delete it
         else:
             failed_extraction = True
-            if pdf_extracted: # pdf has been extracted, delete it
-                os.remove(output_path)
 
         if failed_extraction:
             with open(args.failed_output_log, "a") as f:
