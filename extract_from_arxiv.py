@@ -92,7 +92,11 @@ def extract(args):
     if args.resume_download:
         id_list = remove_downloaded_from_id_list(args, id_list)
 
-    print(f"Extracting {len(id_list)} articles from arXiv")
+        if not id_list:
+            print(f"All articles in {args.input_file} have already been extracted")
+            return 
+
+    print(f"Extracting {len(id_list)} articles from arXiv, using IDs in {args.input_file}")
 
     start = None
 

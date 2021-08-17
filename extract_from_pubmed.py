@@ -120,7 +120,11 @@ def extract(args):
     if args.resume_download:
         id_list = remove_downloaded_from_id_list(args, id_list)
 
-    print(f"Extracting {len(id_list)} articles from PubMed")
+        if not id_list:
+            print(f"All articles in {args.input_file} have already been extracted")
+            return 
+
+    print(f"Extracting {len(id_list)} articles from PubMed, using IDs in {args.input_file}")
     
     for pmcid in id_list:
         failed_extraction = False
