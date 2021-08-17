@@ -13,21 +13,30 @@ def pdf2flowhtml(
     input_dir: Union[Path, str],
     pdf_folder: Union[Path, str],
     filepath: Union[Path, str],
+    output_folder: Union[Path, str],
     outputfile: Union[Path, str],
     use_docker,
 ) -> str:
 
     if use_docker:
-        prefix_command = "sudo docker run --rm -v {}:/pdf -v /tmp:/tmp poppler pdftotext -bbox-layout"
+        command = "sudo docker run --rm -v {}:/pdf -v /tmp:/tmp poppler pdftotext -bbox-layout '{}' '{}'".format(
+            os.path.abspath(input_dir),
+            os.path.join(pdf_folder, filepath),
+            os.path.join(output_folder, outputfile)
+        )
     else:
-        prefix_command = "pdftotext -bbox-layout"
+        command = "pdftotext -bbox-layout '{}' '{}'".format(
+            os.path.join(
+                os.path.join(input_dir, pdf_folder),
+                filepath
+            ),
+            os.path.join(
+                os.path.join(input_dir, output_folder),
+                filepath
+            ),
+        )
 
-    command = "{} '{}' '{}'".format(
-        prefix_command,
-        os.path.abspath(input_dir),
-        os.path.join(pdf_folder, filepath),
-        os.path.join("html", outputfile)
-    )
+    
     subprocess.call(command, shell=True)
 
 
@@ -40,7 +49,7 @@ def convert(args):
 
     for filename in tqdm(fnames, desc=f"Processing PDFs in {args.input_dir}"):
         output_fname = filename[:-4] + ".html"
-        pdf2flowhtml(args.input_dir, args.pdf_folder, filename, output_fname, args.use_docker)
+        pdf2flowhtml(args.input_dir, args.pdf_folder, filename, args.output_folder, output_fname, args.use_docker)
 
 
 if __name__ == "__main__":
