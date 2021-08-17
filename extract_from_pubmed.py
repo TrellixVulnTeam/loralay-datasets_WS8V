@@ -82,8 +82,10 @@ def find_ftp_url(oa_url):
     links = tree.findall(".//link")    
     if len(links) > 1:
         return tree.find('.//link[@format="pdf"]').get("href")
-    else:
+    elif len(links) == 1:
         return links[0].get("href")
+    else:
+        return None
 
 def remove_downloaded_from_id_list(args, id_list):
     """ Remove already downloaded articles and articles that could not be downloaded
@@ -132,7 +134,10 @@ def extract(args):
         oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
         ftp_url = find_ftp_url(oa_url)
         output_path = os.path.join(args.pdf_output_dir, pmcid + ".pdf")
-        if ".pdf" in ftp_url:
+
+        if not ftp_url:
+            pdf_extracted = False
+        elif ".pdf" in ftp_url:
             pdf_extracted = extract_pdf_from_pdf_url(ftp_url, output_path)
         else:
             tar_path = os.path.join(args.tmp_output_dir, pmcid + ".tar.gz")
