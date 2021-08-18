@@ -107,9 +107,8 @@ if __name__ == "__main__":
             shutil.rmtree(args.output_dir)
             os.makedirs(args.output_dir)
 
-            print(f"Overwriting {args.output_dir}")
-            shutil.rmtree(args.output_dir)
-            os.makedirs(args.output_dir)
+            print(f"Overwriting {args.converted_output_log}")
+            os.remove(args.converted_output_log)
         else:
             raise ValueError(
                 f"Output directory ({args.output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
