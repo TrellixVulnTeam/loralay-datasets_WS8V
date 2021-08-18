@@ -73,6 +73,7 @@ def parse(args):
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
     if args.resume_parsing:
+        print("Resuming parsing...")
         fnames = remove_converted_from_id_list(fnames, args.parsed_output_log)
         if not fnames:
             print(f"All documents in {args.input_file} have already been parsed")

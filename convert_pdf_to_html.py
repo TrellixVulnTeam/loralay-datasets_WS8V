@@ -32,7 +32,7 @@ def pdf2flowhtml(
             ),
             os.path.join(
                 os.path.join(output_folder),
-                filepath
+                outputfile
             ),
         )
     
