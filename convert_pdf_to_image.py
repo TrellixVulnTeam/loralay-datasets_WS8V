@@ -11,6 +11,7 @@ def convert(args):
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
     if args.resume_conversion:
+        print("Resuming conversion...")
         fnames = remove_converted_from_id_list(fnames, args.converted_output_log)
         if not fnames:
             print(f"All documents in {args.input_file} have already been converted to image")
