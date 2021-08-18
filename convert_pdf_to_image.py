@@ -20,7 +20,7 @@ def remove_converted(fname_list, converted_log):
     else:
         converted = []
 
-    fname_list = [doc_id for doc_id in fname_list if doc_id not in converted] 
+    fname_list = [doc_id for doc_id in fname_list if doc_id[:-4] not in converted] 
     return fname_list
 
 def convert(args):
