@@ -25,9 +25,10 @@ def remove_converted(fname_list, converted_log):
 
 def convert(args):
     fnames = sorted(os.listdir(args.input_dir))
+
+    fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
+
     fnames = remove_converted(fnames, args.converted_output_log)
-    if args.n_docs > 0:
-        fnames = fnames[:args.n_docs]
 
     for fname in tqdm(fnames):
         pdf_path = os.path.join(args.input_dir, fname)
