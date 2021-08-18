@@ -28,7 +28,11 @@ def convert(args):
 
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
-    fnames = remove_converted(fnames, args.converted_output_log)
+    if args.resume_download:
+        fnames = remove_converted(fnames, args.converted_output_log)
+        if not fnames:
+            print(f"All documents in {args.input_file} have already been converted to image")
+            return
 
     for fname in tqdm(fnames):
         pdf_path = os.path.join(args.input_dir, fname)
