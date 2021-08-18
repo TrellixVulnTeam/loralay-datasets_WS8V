@@ -6,6 +6,27 @@ import xml.etree.ElementTree as ET
 import urllib.request
 import json
 
+def get_last_idx(downloaded_log, failed_log):
+    """ Get last index processed
+
+    Args:
+        downloaded_log (string): Path to log containing IDs of downloaded documents
+        failed_log (string): Path to log containing IDs of documents that could 
+                             not be downloaded
+
+    Returns:
+        int: Last index processed
+    """
+    with open(downloaded_log, "r") as f:
+        lines = f.read().splitlines()
+        last_downloaded_idx = lines[-1].split("\t")[0]
+
+    with open(failed_log, "r") as f:
+        lines = f.read().splitlines()
+        last_failed_idx = lines[-1].split("\t")[0]
+
+    return max(last_downloaded_idx, last_failed_idx)
+
 def extract_pdf(url, output_path):
     """ Extract PDF based on URL
 
@@ -25,21 +46,27 @@ def extract_pdf(url, output_path):
 
 def extract(args):
     if args.resume_download:
-        pass
+        start_idx = get_last_idx(args.downloaded_output_log, args.failed_output_log) + 1
+        stop_idx = start_idx + args.n_docs
     else:
-        url = "https://api.archives-ouvertes.fr/search/" \
-            "?q=*:*&" \
-            "wt=json&" \
-            "indent=True&" \
-            f"fl=docid,files_s,{args.lang}_abstract_s&" \
-            f"fq=language_s:{args.lang}+submitType_s:file+docType_s:ART" 
+        start_idx = 0
+        stop_idx = args.n_docs 
+
+    url = "https://api.archives-ouvertes.fr/search/" \
+        "?q=*:*&" \
+        "wt=json&" \
+        "indent=True&" \
+        f"fl=docid,files_s,{args.lang}_abstract_s&" \
+        f"fq=language_s:{args.lang}+submitType_s:file+docType_s:ART&" \
+        f"start={start_idx}&rows={stop_idx}"  
     
     print(url)
 
     response = urllib.request.urlopen(url).read().decode()
     data = json.loads(response)
+    start_idx = int(data["response"]["start"])
 
-    for item in data["response"]["docs"]:
+    for i, item in enumerate(data["response"]["docs"]):
         failed_extraction = False 
         if args.lang + "_abstract_s" not in item:
             failed_extraction = True 
@@ -69,10 +96,10 @@ def extract(args):
 
         if failed_extraction:
             with open(args.failed_output_log, "a") as f:
-                f.write(docid + "\n")
+                f.write(str(start_idx + i) + "\t" + docid + "\n")
         else:
             with open(args.downloaded_output_log, "a") as f:
-                f.write(docid + "\n")
+                f.write(str(start_idx + i) + "\t" + docid + "\n")
 
                 
 
@@ -107,7 +134,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_docs",
         type=int,
-        default=5,
+        default=30,
     )
     parser.add_argument(
         "--resume_download",

@@ -35,7 +35,6 @@ def pdf2flowhtml(
                 filepath
             ),
         )
-
     
     subprocess.call(command, shell=True)
 

@@ -5,7 +5,7 @@ import subprocess
 import tarfile 
 import xml.etree.ElementTree as ET
 import urllib.request
-from utils import get_ids
+from utils import get_ids, remove_downloaded_from_id_list
 
 def extract_abstract(url):
     """ Extract abstract using the BioC API
@@ -87,40 +87,14 @@ def find_ftp_url(oa_url):
     else:
         return None
 
-def remove_downloaded_from_id_list(args, id_list):
-    """ Remove already downloaded articles and articles that could not be downloaded
-
-    Args:
-        args (Namespace): command line arguments
-        id_list (list): list of PMCIDs  
-
-    Returns:
-        list: list of PMCIDs whose articles have not been downloaded yet
-    """
-    if os.path.isfile(args.failed_output_log):
-        with open(args.failed_output_log, "r") as f:
-            failed_to_download = f.read().splitlines()
-    else:
-        failed_to_download = []
-
-    if os.path.isfile(args.downloaded_output_log):
-        with open(args.downloaded_output_log, "r") as f:
-            downloaded = f.read().splitlines()
-    else:
-        downloaded = []
-
-    id_list = [
-        pmcid for pmcid in id_list if (
-            pmcid not in failed_to_download and pmcid not in downloaded
-        )
-    ] # remove pmcids whose articles could not be downloaded or whose have already been downloaded
-    return id_list
 
 def extract(args):
     id_list = get_ids(args.input_file, args.n_docs)
 
     if args.resume_download:
-        id_list = remove_downloaded_from_id_list(args, id_list)
+        id_list = remove_downloaded_from_id_list(
+            id_list, args.downloaded_output_log, args.failed_output_log
+        )
 
         if not id_list:
             print(f"All articles in {args.input_file} have already been extracted")

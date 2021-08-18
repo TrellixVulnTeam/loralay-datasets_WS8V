@@ -1,18 +1,39 @@
 import argparse 
 import os
 import shutil
-import glob
 from tqdm import tqdm 
 import tarfile
 from pdf2image import convert_from_path
 
+def remove_converted(fname_list, converted_log):
+    """ Removes from list documents that have already been converted 
+
+    Args:
+        fname_list (list): list of PDF names 
+        converted_log (string): path to log containing IDs of converted documents
+    Returns:
+        list: list of document IDs whose PDF has not been converted yet
+    """
+    if os.path.isfile(converted_log):
+        with open(args.converted_output_log, "r") as f:
+            converted = f.read().splitlines()
+    else:
+        converted = []
+
+    fname_list = [doc_id for doc_id in fname_list if doc_id not in converted] 
+    return fname_list
 
 def convert(args):
-    fnames = os.listdir(args.input_dir)
+    fnames = sorted(os.listdir(args.input_dir))
+    fnames = remove_converted(fnames, args.converted_output_log)
+    if args.n_docs > 0:
+        fnames = fnames[:args.n_docs]
 
     for fname in tqdm(fnames):
         pdf_path = os.path.join(args.input_dir, fname)
         output_folder = os.path.join(args.output_dir, fname[:-4])
+
+        # convert
         os.makedirs(output_folder)
         convert_from_path(
             pdf_path, 
@@ -23,20 +44,16 @@ def convert(args):
             output_folder=output_folder,
         )
 
+        # compress output images
         tar_path = os.path.join(args.output_dir, fname[:-4] + ".tar.gz")
         with tarfile.open(tar_path, "w:gz") as tar:
             tar.add(output_folder, arcname=os.path.basename(output_folder)) 
 
         shutil.rmtree(output_folder)
-        # for i, page in enumerate(pages):
-        #     page.save(
-        #         os.path.join(output_folder, f"{fname[:-4]}_{i+1}.jpg"),
-        #         "JPEG"
-        #     )
 
-        # ppm_files = glob.glob(f"{output_folder}/*.ppm")
-        # for f in ppm_files:
-        #     os.remove(f)
+        with open(args.converted_output_log, "a") as f:
+            f.write(fname[:-4] + "\n")
+       
 
 
 if __name__ == "__main__":
@@ -55,6 +72,11 @@ if __name__ == "__main__":
         "--first_page", 
         type=int,
         default=1,
+    )
+    parser.add_argument(
+        "--n_docs", 
+        type=int,
+        default=5,
     )
     parser.add_argument(
         "--converted_output_log",
