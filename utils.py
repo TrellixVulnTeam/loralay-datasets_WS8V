@@ -62,5 +62,5 @@ def remove_converted_from_id_list(fname_list, converted_log):
     else:
         converted = []
 
-    fname_list = [doc_id for doc_id in fname_list if doc_id[:-4] not in converted] 
+    fname_list = [doc_id for doc_id in fname_list if os.path.splitext(doc_id)[0] not in converted] 
     return fname_list

@@ -27,11 +27,11 @@ def pdf2flowhtml(
     else:
         command = "pdftotext -bbox-layout '{}' '{}'".format(
             os.path.join(
-                os.path.join(input_dir, pdf_folder),
+                os.path.join(pdf_folder),
                 filepath
             ),
             os.path.join(
-                os.path.join(input_dir, output_folder),
+                os.path.join(output_folder),
                 filepath
             ),
         )
