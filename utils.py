@@ -46,3 +46,21 @@ def remove_downloaded_from_id_list(id_list, downloaded_log, failed_log):
         )
     ] # remove ids whose articles could not be downloaded or whose have already been downloaded
     return id_list
+
+def remove_converted_from_id_list(fname_list, converted_log):
+    """ Removes from list documents that have already been converted 
+
+    Args:
+        fname_list (list): list of PDF names 
+        converted_log (string): path to log containing IDs of converted documents
+    Returns:
+        list: list of document IDs whose PDF has not been converted yet
+    """
+    if os.path.isfile(converted_log):
+        with open(converted_log, "r") as f:
+            converted = f.read().splitlines()
+    else:
+        converted = []
+
+    fname_list = [doc_id for doc_id in fname_list if doc_id[:-4] not in converted] 
+    return fname_list

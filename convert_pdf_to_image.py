@@ -4,32 +4,14 @@ import shutil
 from tqdm import tqdm 
 import tarfile
 from pdf2image import convert_from_path
-
-def remove_converted(fname_list, converted_log):
-    """ Removes from list documents that have already been converted 
-
-    Args:
-        fname_list (list): list of PDF names 
-        converted_log (string): path to log containing IDs of converted documents
-    Returns:
-        list: list of document IDs whose PDF has not been converted yet
-    """
-    if os.path.isfile(converted_log):
-        with open(args.converted_output_log, "r") as f:
-            converted = f.read().splitlines()
-    else:
-        converted = []
-
-    fname_list = [doc_id for doc_id in fname_list if doc_id[:-4] not in converted] 
-    return fname_list
+from utils import remove_converted_from_id_list
 
 def convert(args):
     fnames = sorted(os.listdir(args.input_dir))
-
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
-    if args.resume_download:
-        fnames = remove_converted(fnames, args.converted_output_log)
+    if args.resume_conversion:
+        fnames = remove_converted_from_id_list(fnames, args.converted_output_log)
         if not fnames:
             print(f"All documents in {args.input_file} have already been converted to image")
             return
@@ -89,7 +71,7 @@ if __name__ == "__main__":
         default="./converted_to_img.log"
     )
     parser.add_argument(
-        "--resume_download", 
+        "--resume_conversion", 
         action="store_true", 
         help="Resume download."
     )
@@ -101,12 +83,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.resume_download and args.overwrite_output_dir:
+    if args.resume_conversion and args.overwrite_output_dir:
         raise ValueError(
-            f"Cannot use --resume_download and --overwrite_output_dir at the same time."
+            f"Cannot use --resume_conversion and --overwrite_output_dir at the same time."
         )
 
-    if os.listdir(args.output_dir) and not args.resume_download:
+    if os.listdir(args.output_dir) and not args.resume_conversion:
         if args.overwrite_output_dir:
             print(f"Overwriting {args.output_dir}")
             shutil.rmtree(args.output_dir)
