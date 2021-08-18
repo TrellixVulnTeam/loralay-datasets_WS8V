@@ -111,7 +111,10 @@ if __name__ == "__main__":
             f"Cannot use --resume_conversion and --overwrite_output_dir at the same time."
         )
 
-    output_dir = os.path.join(args.input_dir, args.output_folder)
+    if args.use_docker:
+        output_dir = os.path.join(args.input_dir, args.output_folder)
+    else:
+        output_dir = args.output_folder
     if os.listdir(output_dir) and not args.resume_conversion:
         if args.overwrite_output_dir:
             print(f"Overwriting {output_dir}")
