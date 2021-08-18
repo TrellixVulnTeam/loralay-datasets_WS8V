@@ -40,7 +40,11 @@ def pdf2flowhtml(
 
 
 def convert(args):
-    fnames = sorted(os.listdir(os.path.join(args.input_dir, args.pdf_folder)))
+    if args.use_docker:
+        pdf_path = os.path.join(args.input_dir, args.pdf_folder)
+    else:
+        pdf_path = args.pdf_folder
+    fnames = sorted(os.listdir(pdf_path))
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
     if args.resume_conversion:
@@ -49,7 +53,7 @@ def convert(args):
             print(f"All documents in {args.input_file} have already been converted to HTML")
             return
 
-    for filename in tqdm(fnames, desc=f"Processing PDFs in {args.input_dir}"):
+    for filename in tqdm(fnames, desc=f"Processing PDFs in {pdf_path}"):
         output_fname = filename[:-4] + ".html"
         pdf2flowhtml(args.input_dir, args.pdf_folder, filename, args.output_folder, output_fname, args.use_docker)
 
