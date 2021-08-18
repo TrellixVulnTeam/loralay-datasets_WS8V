@@ -96,7 +96,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if os.listdir(args.output_dir):
+    if args.resume_download and args.overwrite_output_dir:
+        raise ValueError(
+            f"Cannot use --resume_download and --overwrite_output_dir at the same time."
+        )
+
+    if os.listdir(args.output_dir) and not args.resume_download:
         if args.overwrite_output_dir:
             print(f"Overwriting {args.output_dir}")
             shutil.rmtree(args.output_dir)
