@@ -110,6 +110,12 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
+        "--dataset_name",
+        default=None,
+        stype=str,
+        required=True,
+    )
+    parser.add_argument(
         "--overwrite_output_dir", 
         action="store_true", 
         help="Overwrite the output directory."

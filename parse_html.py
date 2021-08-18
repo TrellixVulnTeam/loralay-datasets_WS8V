@@ -123,7 +123,7 @@ def parse(args):
         
         shutil.rmtree(doc_output_dir)
 
-        with open(args.converted_output_log, "a") as f:
+        with open(args.parsed_output_log, "a") as f:
             f.write(doc_id + "\n")
                     
 
@@ -168,7 +168,7 @@ if __name__ == "__main__":
             f"Cannot use --resume_parsing and --overwrite_output_dir at the same time."
         )
 
-    if os.listdir(args.output_dir):
+    if os.listdir(args.output_dir) and not args.resume_parsing:
         if args.overwrite_output_dir:
             print(f"Overwriting {args.output_dir}")
             shutil.rmtree(args.output_dir)
@@ -178,7 +178,7 @@ if __name__ == "__main__":
             os.remove(args.parsed_output_log)
         else:
             raise ValueError(
-                f"Output directory ({args.output_img_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
+                f"Output directory ({args.output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
             )
 
     parse(args)

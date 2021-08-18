@@ -25,7 +25,7 @@ def get_last_idx(downloaded_log, failed_log):
         lines = f.read().splitlines()
         last_failed_idx = lines[-1].split("\t")[0]
 
-    return max(last_downloaded_idx, last_failed_idx)
+    return max(int(last_downloaded_idx), int(last_failed_idx))
 
 def extract_pdf(url, output_path):
     """ Extract PDF based on URL
@@ -47,7 +47,7 @@ def extract_pdf(url, output_path):
 def extract(args):
     if args.resume_download:
         start_idx = get_last_idx(args.downloaded_output_log, args.failed_output_log) + 1
-        stop_idx = start_idx + args.n_docs
+        stop_idx = args.n_docs - start_idx
     else:
         start_idx = 0
         stop_idx = args.n_docs 
@@ -68,11 +68,10 @@ def extract(args):
 
     for i, item in enumerate(data["response"]["docs"]):
         failed_extraction = False 
+        docid = str(item["docid"])
         if args.lang + "_abstract_s" not in item:
             failed_extraction = True 
         else:
-            docid = str(item["docid"])
-
             pdf_output_path = os.path.join(args.pdf_output_dir, docid + ".pdf")        
             abstract_output_path = os.path.join(args.abstract_output_dir, docid + ".txt")
 
