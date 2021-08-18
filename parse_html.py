@@ -4,7 +4,9 @@ import argparse
 from tqdm import tqdm
 from lxml.etree import iterparse
 import re
+import tarfile
 import logging
+from utils import remove_converted_from_id_list
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +69,16 @@ def extract_text_from_tree(file_path):
     return doc
 
 def parse(args):
-    for html in tqdm(sorted(os.listdir(args.html_dir))):
+    fnames = sorted(os.listdir(args.html_dir))
+    fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
+
+    if args.resume_parsing:
+        fnames = remove_converted_from_id_list(fnames, args.parsed_output_log)
+        if not fnames:
+            print(f"All documents in {args.input_file} have already been parsed")
+            return
+
+    for html in tqdm(fnames):
         html_path = os.path.join(args.html_dir, html)
         doc = extract_text_from_tree(html_path)
 
@@ -105,6 +116,15 @@ def parse(args):
                         + str(page_height) 
                         + "\n" 
                     )
+        # compress output txt files 
+        tar_path = doc_output_dir + ".tar.gz"
+        with tarfile.open(tar_path, "w:gz") as tar:
+            tar.add(doc_output_dir, arcname=os.path.basename(doc_output_dir))
+        
+        shutil.rmtree(doc_output_dir)
+
+        with open(args.converted_output_log, "a") as f:
+            f.write(doc_id + "\n")
                     
 
 if __name__ == "__main__":
@@ -121,6 +141,21 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
+        "--n_docs", 
+        type=int,
+        default=5,
+    )
+    parser.add_argument(
+        "--parsed_output_log",
+        type=str,
+        default="./parsed_to_img.log"
+    )
+    parser.add_argument(
+        "--resume_parsing", 
+        action="store_true", 
+        help="Resume download."
+    )
+    parser.add_argument(
         "--overwrite_output_dir", 
         action="store_true", 
         help="Overwrite the output directory."
@@ -128,11 +163,19 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    if args.resume_parsing and args.overwrite_output_dir:
+        raise ValueError(
+            f"Cannot use --resume_parsing and --overwrite_output_dir at the same time."
+        )
+
     if os.listdir(args.output_dir):
         if args.overwrite_output_dir:
             print(f"Overwriting {args.output_dir}")
             shutil.rmtree(args.output_dir)
             os.makedirs(args.output_dir)
+
+            print(f"Overwriting {args.parsed_output_log}")
+            os.remove(args.parsed_output_log)
         else:
             raise ValueError(
                 f"Output directory ({args.output_img_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
