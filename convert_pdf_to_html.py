@@ -7,7 +7,7 @@ import os
 import shutil
 import argparse
 from tqdm import tqdm
-from utils import remove_converted_from_id_list
+from utils import remove_processed_from_id_list
 
 def pdf2flowhtml(
     input_dir: Union[Path, str],
@@ -26,14 +26,8 @@ def pdf2flowhtml(
         )
     else:
         command = "pdftotext -bbox-layout '{}' '{}'".format(
-            os.path.join(
-                os.path.join(pdf_folder),
-                filepath
-            ),
-            os.path.join(
-                os.path.join(output_folder),
-                outputfile
-            ),
+            os.path.join(pdf_folder, filepath),
+            os.path.join(output_folder, outputfile)
         )
     
     # subprocess.call(command, shell=True)
@@ -53,9 +47,9 @@ def convert(args):
 
     if args.resume_conversion:
         print("Resuming conversion...")
-        fnames = remove_converted_from_id_list(fnames, args.converted_output_log)
+        fnames = remove_processed_from_id_list(fnames, args.converted_output_log)
         if not fnames:
-            print(f"All documents in {args.input_file} have already been converted to HTML")
+            print(f"All documents in {pdf_path} have already been converted to HTML")
             return
 
     for filename in tqdm(fnames, desc=f"Processing PDFs in {pdf_path}"):

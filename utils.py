@@ -1,5 +1,6 @@
 import json
 import os 
+import tarfile
 
 def get_ids(input_file, limit):
     id_list = []
@@ -47,7 +48,7 @@ def remove_downloaded_from_id_list(id_list, downloaded_log, failed_log):
     ] # remove ids whose articles could not be downloaded or whose have already been downloaded
     return id_list
 
-def remove_converted_from_id_list(fname_list, converted_log):
+def remove_processed_from_id_list(fname_list, converted_log):
     """ Removes from list documents that have already been converted 
 
     Args:
@@ -64,3 +65,10 @@ def remove_converted_from_id_list(fname_list, converted_log):
 
     fname_list = [doc_id for doc_id in fname_list if os.path.splitext(doc_id)[0] not in converted] 
     return fname_list
+
+def compress_dir(tar_path, output_folder):
+    with tarfile.open(tar_path, "w:gz") as tar:
+        tar.add(
+            output_folder, 
+            arcname=os.path.basename(output_folder)
+        ) 

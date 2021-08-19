@@ -6,7 +6,7 @@ from lxml.etree import iterparse
 import re
 import tarfile
 import logging
-from utils import remove_converted_from_id_list
+from utils import remove_processed_from_id_list, compress_dir
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ def parse(args):
 
     if args.resume_parsing:
         print("Resuming parsing...")
-        fnames = remove_converted_from_id_list(fnames, args.parsed_output_log)
+        fnames = remove_processed_from_id_list(fnames, args.parsed_output_log)
         if not fnames:
             print(f"All documents in {args.input_file} have already been parsed")
             return
@@ -89,7 +89,7 @@ def parse(args):
 
         for i, p in enumerate(doc):
             output_file = os.path.join(
-                os.path.join(doc_output_dir, doc_id + "_" + str(i+1) + ".txt")
+                os.path.join(doc_output_dir, doc_id + "-" + str(i+1) + ".txt")
             )
             with open(output_file, "w", encoding="utf-8") as fw:
                 for elem in p:
@@ -119,8 +119,7 @@ def parse(args):
                     )
         # compress output txt files 
         tar_path = doc_output_dir + ".tar.gz"
-        with tarfile.open(tar_path, "w:gz") as tar:
-            tar.add(doc_output_dir, arcname=os.path.basename(doc_output_dir))
+        compress_dir(tar_path, doc_output_dir)
         
         shutil.rmtree(doc_output_dir)
 
@@ -149,7 +148,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--parsed_output_log",
         type=str,
-        default="./parsed_to_img.log"
+        default="./parsed.log"
     )
     parser.add_argument(
         "--resume_parsing", 

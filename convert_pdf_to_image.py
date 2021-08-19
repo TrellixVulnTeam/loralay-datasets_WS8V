@@ -4,7 +4,7 @@ import shutil
 from tqdm import tqdm 
 import tarfile
 from pdf2image import convert_from_path
-from utils import remove_converted_from_id_list
+from utils import remove_processed_from_id_list, compress_dir
 
 def convert(args):
     fnames = sorted(os.listdir(args.input_dir))
@@ -12,35 +12,37 @@ def convert(args):
 
     if args.resume_conversion:
         print("Resuming conversion...")
-        fnames = remove_converted_from_id_list(fnames, args.converted_output_log)
+        fnames = remove_processed_from_id_list(fnames, args.converted_output_log)
         if not fnames:
-            print(f"All documents in {args.input_file} have already been converted to image")
+            print(f"All documents in {args.input_dir} have already been converted to image")
             return
 
     for fname in tqdm(fnames):
+        doc_id = fname[:-4]
         pdf_path = os.path.join(args.input_dir, fname)
-        output_folder = os.path.join(args.output_dir, fname[:-4])
+        output_folder = os.path.join(args.output_dir, doc_id)
 
         # convert
         os.makedirs(output_folder)
-        convert_from_path(
-            pdf_path, 
-            dpi=300, 
-            fmt="jpg",
-            first_page=args.first_page,
-            output_file=fname[:-4],
-            output_folder=output_folder,
-        )
+        # pages = convert_from_path(
+        #     pdf_path, 
+        #     dpi=300, 
+        #     fmt="jpg",          
+        #     first_page=args.first_page,
+        #     output_file=fname[:-4],
+        #     output_folder=output_folder,
+        # )
+        pages = convert_from_path(pdf_path, dpi=300)
+        for i, p in enumerate(pages):
+            p.save(os.path.join(output_folder, doc_id + "-" + str(i+1) + ".jpg"))
 
         # compress output images
-        tar_path = os.path.join(args.output_dir, fname[:-4] + ".tar.gz")
-        with tarfile.open(tar_path, "w:gz") as tar:
-            tar.add(output_folder, arcname=os.path.basename(output_folder)) 
-
+        tar_path = os.path.join(args.output_dir, doc_id + ".tar.gz")
+        compress_dir(tar_path, output_folder)
         shutil.rmtree(output_folder)
 
         with open(args.converted_output_log, "a") as f:
-            f.write(fname[:-4] + "\n")
+            f.write(doc_id + "\n")
        
 
 
@@ -74,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--resume_conversion", 
         action="store_true", 
-        help="Resume download."
+        help="Resume conversion."
     )
     parser.add_argument(
         "--overwrite_output_dir", 
