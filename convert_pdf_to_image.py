@@ -24,15 +24,7 @@ def convert(args):
 
         # convert
         os.makedirs(output_folder)
-        # pages = convert_from_path(
-        #     pdf_path, 
-        #     dpi=300, 
-        #     fmt="jpg",          
-        #     first_page=args.first_page,
-        #     output_file=fname[:-4],
-        #     output_folder=output_folder,
-        # )
-        pages = convert_from_path(pdf_path, dpi=300)
+        pages = convert_from_path(pdf_path, dpi=100)
         for i, p in enumerate(pages):
             p.save(os.path.join(output_folder, doc_id + "-" + str(i+1) + ".jpg"))
 
