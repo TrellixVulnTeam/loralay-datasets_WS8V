@@ -1,7 +1,6 @@
 from sys import prefix
 from typing import Optional, Union
 import subprocess
-from subprocess import PIPE
 from pathlib import Path
 import os
 import shutil
@@ -25,7 +24,7 @@ def pdf2flowhtml(
             os.path.join(output_folder, outputfile)
         )
     else:
-        command = "pdftotext -bbox -layout '{}' '{}'".format(
+        command = "pdftotext -bbox-layout '{}' '{}'".format(
             os.path.join(pdf_folder, filepath),
             os.path.join(output_folder, outputfile)
         )
@@ -67,8 +66,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--input_dir", 
         type=str,
-        required=True,
-        help="The input directory. Should be one folder above the one containing the PDF files."
+        help="The input directory. If using docker, should be one "\
+            "folder above the one containing the PDF files."
     )
     parser.add_argument(
         "--pdf_folder", 
@@ -92,12 +91,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--converted_output_log",
         type=str,
-        default="./converted_to_img.log"
+        default="./converted_to_html.log"
     )
     parser.add_argument(
         "--failed_output_log",
         type=str,
-        default="./failed_to_convert.log"
+        default="./failed_to_convert_html.log"
     )
     parser.add_argument(
         "--resume_conversion", 
