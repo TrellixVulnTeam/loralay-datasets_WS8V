@@ -6,7 +6,7 @@ import os
 import shutil
 import argparse
 from tqdm import tqdm
-from utils import remove_processed_from_id_list
+from src.utils import remove_processed_from_id_list
 
 def pdf2flowhtml(
     input_dir: Union[Path, str],
@@ -29,7 +29,6 @@ def pdf2flowhtml(
             os.path.join(output_folder, outputfile)
         )
     
-    # subprocess.call(command, shell=True)
     if subprocess.check_output(command, shell=True):
         return False 
     else:
@@ -45,11 +44,11 @@ def convert(args):
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
     if args.resume:
-        ext = ".html"
+        ext = ".pdf"
         fnames = [fname[:-len(ext)] for fname in fnames]
         print("Resuming conversion...")
         fnames = remove_processed_from_id_list(
-            fnames, args.converted_output_log, args.failed_output_log
+            fnames, args.converted_output_log
         )
         if not fnames:
             print(f"All documents in {pdf_path} have already been converted to HTML")
@@ -59,12 +58,11 @@ def convert(args):
 
     for filename in tqdm(fnames, desc=f"Processing PDFs in {pdf_path}"):
         output_fname = filename[:-4] + ".html"
-        if pdf2flowhtml(args.input_dir, args.pdf_folder, filename, args.output_folder, output_fname, args.use_docker):
-            with open(args.converted_output_log, "a") as f:
-                f.write(filename[:-4] + "\n")
-        else:
-            with open(args.failed_output_log, "a") as f:
-                f.write(filename[:-4] + "\n")
+        pdf2flowhtml(
+            args.input_dir, args.pdf_folder, filename, args.output_folder, output_fname, args.use_docker
+        )
+        with open(args.converted_output_log, "a") as f:
+            f.write(filename[:-4] + "\n")
 
 
 if __name__ == "__main__":
@@ -100,11 +98,6 @@ if __name__ == "__main__":
         default="./converted_to_html.log"
     )
     parser.add_argument(
-        "--failed_output_log",
-        type=str,
-        default="./failed_to_convert_html.log"
-    )
-    parser.add_argument(
         "--resume", 
         action="store_true", 
         help="Resume download."
@@ -133,12 +126,10 @@ if __name__ == "__main__":
             shutil.rmtree(output_dir)
             os.makedirs(output_dir)
 
-            print(f"Overwriting {args.converted_output_log}")
-            os.remove(args.converted_output_log)
+            if os.path.isfile(args.converted_output_log):
+                print(f"Overwriting {args.converted_output_log}")
+                os.remove(args.converted_output_log)
 
-            if os.path.isfile(args.failed_output_log):
-                print(f"Overwriting {args.failed_output_log}")
-                os.remove(args.failed_output_log)
         else:
             raise ValueError(
                 f"Output directory ({output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."

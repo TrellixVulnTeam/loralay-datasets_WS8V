@@ -2,7 +2,6 @@ import argparse
 import os 
 import shutil
 import subprocess
-import xml.etree.ElementTree as ET
 import urllib.request
 import json
 
@@ -45,7 +44,7 @@ def extract_pdf(url, output_path):
     return False 
 
 def extract(args):
-    if args.resume_download:
+    if args.resume:
         start_idx = get_last_idx(args.downloaded_output_log, args.failed_output_log) + 1
         stop_idx = args.n_docs - start_idx
     else:
@@ -136,7 +135,7 @@ if __name__ == "__main__":
         default=30,
     )
     parser.add_argument(
-        "--resume_download",
+        "--resume",
         action="store_true", 
         help="Resume download."
     )
@@ -148,22 +147,24 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.resume_download and args.overwrite_output_dir:
+    if args.resume and args.overwrite_output_dir:
         raise ValueError(
-            f"Cannot use --resume_download and --overwrite_output_dir at the same time."
+            f"Cannot use --resume and --overwrite_output_dir at the same time."
         )
 
-    if os.listdir(args.pdf_output_dir) and not args.resume_download:
+    if os.listdir(args.pdf_output_dir) and not args.resume:
         if args.overwrite_output_dir:
             for output_dir in [
                 args.pdf_output_dir, args.abstract_output_dir
             ]:
-                print(f"Overwriting {output_dir}")
-                shutil.rmtree(output_dir)
-                os.makedirs(output_dir)
+                if os.listdir(output_dir):
+                    print(f"Overwriting {output_dir}")
+                    shutil.rmtree(output_dir)
+                    os.makedirs(output_dir)
 
-            print(f"Overwriting {args.downloaded_output_log}")
-            os.remove(args.downloaded_output_log)
+            if os.path.isfile(args.downloaded_output_log):
+                print(f"Overwriting {args.downloaded_output_log}")
+                os.remove(args.downloaded_output_log)
             if os.path.isfile(args.failed_output_log):
                 print(f"Overwriting {args.failed_output_log}")
                 os.remove(args.failed_output_log)
@@ -175,14 +176,6 @@ if __name__ == "__main__":
             if os.listdir(args.abstract_output_dir):
                 raise ValueError(
                     f"Output directory ({args.abstract_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
-                )
-            if os.path.isfile(args.downloaded_output_log):
-                raise ValueError(
-                    f"Output file ({args.downloaded_output_log}) already exists. Use --overwrite_output_dir to overcome."
-                )
-            if os.path.isfile(args.failed_output_log):
-                raise ValueError(
-                    f"Output file ({args.failed_output_log}) already exists. Use --overwrite_output_dir to overcome."
                 )
 
 

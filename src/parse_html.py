@@ -4,9 +4,8 @@ import argparse
 from tqdm import tqdm
 from lxml.etree import iterparse
 import re
-import tarfile
 import logging
-from utils import remove_processed_from_id_list, compress_dir
+from src.utils import remove_processed_from_id_list, compress_dir
 
 logger = logging.getLogger(__name__)
 

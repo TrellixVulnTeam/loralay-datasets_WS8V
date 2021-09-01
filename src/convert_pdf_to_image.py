@@ -3,32 +3,34 @@ import os
 import shutil
 from tqdm import tqdm 
 from pdf2image import convert_from_path
-from utils import remove_processed_from_id_list, compress_dir
+from src.utils import remove_processed_from_id_list, compress_dir
 
 def convert(args):
     fnames = sorted(os.listdir(args.input_dir))
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
+    input_ext = ".pdf"
+    output_ext = ".jpg"
+
     if args.resume:
-        ext = ".jpg"
-        fnames = [fname[:-len(fname)] for fname in fnames]
+        fnames = [fname[:-len(input_ext)] for fname in fnames]
         print("Resuming conversion...")
         fnames = remove_processed_from_id_list(fnames, args.converted_output_log)
         if not fnames:
             print(f"All documents in {args.input_dir} have already been converted to image")
             return
-        fnames = [fname + ext for fname in fnames]
+        fnames = [fname + input_ext for fname in fnames]
 
     for fname in tqdm(fnames):
-        doc_id = fname[:-4]
+        doc_id = fname[:-len(input_ext)]
         pdf_path = os.path.join(args.input_dir, fname)
         output_folder = os.path.join(args.output_dir, doc_id)
 
         # convert
         os.makedirs(output_folder)
-        pages = convert_from_path(pdf_path, dpi=100)
+        pages = convert_from_path(pdf_path, dpi=args.dpi)
         for i, p in enumerate(pages):
-            p.save(os.path.join(output_folder, doc_id + "-" + str(i+1) + ".jpg"))
+            p.save(os.path.join(output_folder, doc_id + "-" + str(i+1) + output_ext))
 
         # compress output images
         tar_path = os.path.join(args.output_dir, doc_id + ".tar.gz")
@@ -61,6 +63,11 @@ if __name__ == "__main__":
         "--n_docs", 
         type=int,
         default=5,
+    )
+    parser.add_argument(
+        "--dpi", 
+        type=int,
+        default=100,
     )
     parser.add_argument(
         "--converted_output_log",
