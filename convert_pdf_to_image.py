@@ -2,7 +2,6 @@ import argparse
 import os
 import shutil
 from tqdm import tqdm 
-import tarfile
 from pdf2image import convert_from_path
 from utils import remove_processed_from_id_list, compress_dir
 
@@ -10,12 +9,15 @@ def convert(args):
     fnames = sorted(os.listdir(args.input_dir))
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
-    if args.resume_conversion:
+    if args.resume:
+        ext = ".jpg"
+        fnames = [fname[:-len(fname)] for fname in fnames]
         print("Resuming conversion...")
         fnames = remove_processed_from_id_list(fnames, args.converted_output_log)
         if not fnames:
             print(f"All documents in {args.input_dir} have already been converted to image")
             return
+        fnames = [fname + ext for fname in fnames]
 
     for fname in tqdm(fnames):
         doc_id = fname[:-4]
@@ -66,7 +68,7 @@ if __name__ == "__main__":
         default="./converted_to_img.log"
     )
     parser.add_argument(
-        "--resume_conversion", 
+        "--resume", 
         action="store_true", 
         help="Resume conversion."
     )
@@ -78,12 +80,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.resume_conversion and args.overwrite_output_dir:
+    if args.resume and args.overwrite_output_dir:
         raise ValueError(
-            f"Cannot use --resume_conversion and --overwrite_output_dir at the same time."
+            f"Cannot use --resume and --overwrite_output_dir at the same time."
         )
 
-    if os.listdir(args.output_dir) and not args.resume_conversion:
+    if os.listdir(args.output_dir) and not args.resume:
         if args.overwrite_output_dir:
             print(f"Overwriting {args.output_dir}")
             shutil.rmtree(args.output_dir)

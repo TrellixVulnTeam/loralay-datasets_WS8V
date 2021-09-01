@@ -22,7 +22,7 @@ def find_word_idx_for_span(text, start_idx, end_idx):
 
     return (abstract_idx[0], abstract_idx[-1])
 
-def find_abstract_span(text, abstract_text):
+def find_abstract_span(text, abstract_text, max_l_dist):
     start_idx = text.find(abstract_text)
     
     if start_idx != -1:
@@ -30,7 +30,7 @@ def find_abstract_span(text, abstract_text):
         abstract_idx = find_word_idx_for_span(text, start_idx, end_idx)
         return abstract_idx
 
-    matches = find_near_matches(abstract_text, text, max_l_dist=args.max_l_dist)
+    matches = find_near_matches(abstract_text, text, max_l_dist=max_l_dist)
 
     if matches:
         start_idx = matches[0].start
@@ -39,17 +39,26 @@ def find_abstract_span(text, abstract_text):
         abstract_idx = find_word_idx_for_span(text, start_idx, end_idx)
         return abstract_idx
 
-    match = re.search("(?:" + abstract_text + "){e<=5}", text)
+    match = re.search("(?:" + re.escape(abstract_text) + "){e<=5}", text)
 
-    if not match:
-        return None
-    else:
+    if match:
         span = match.span()
         start_idx = span[0]
         end_idx = span[1] 
 
         abstract_idx = find_word_idx_for_span(text, start_idx, end_idx)
         return abstract_idx
+
+    # if dataset_type == "arxiv":
+    #     words = text.split()
+    #     words = [w.lower() for w in words] # first sections in arxiv are generally named introduction
+        
+    #     if "introduction" in words:
+    #         end_idx = words.index("introduction") - 1
+    #         print(end_idx)
+    #         return (0, end_idx)
+
+    return None 
 
 
 def _update_text(page_path, doc_lines, abstract_span):
@@ -99,16 +108,21 @@ def find_and_remove(args):
     doc_dirs = doc_dirs[:args.n_docs] if args.n_docs > 0 else doc_dirs 
 
     if args.resume_processing:
+        ext = ".tar.gz"
+        doc_dirs = [doc[:-len(ext)] for doc in doc_dirs]
         print("Resuming processing...")
-        doc_dirs = remove_processed_from_id_list(doc_dirs, args.found_output_log)
+        doc_dirs = remove_processed_from_id_list(
+            doc_dirs, args.found_output_log, args.failed_output_log
+        )
         if not doc_dirs:
             print(f"All documents in {args.text_dir} have already been processed.")
+            return 
+        doc_dirs = [doc + ext for doc in doc_dirs]
 
     for doc_tar in tqdm(doc_dirs):
         doc_id = doc_tar.replace(".tar.gz", "")
         abstract_path = os.path.join(args.abstract_dir, doc_id + ".txt")
         abstract_text = " ".join(extract_from_txt(abstract_path))
-        print(abstract_text)
 
         txt_tar_path = os.path.join(args.text_dir, doc_tar)
         img_tar_path = os.path.join(args.img_dir, doc_tar)
@@ -131,7 +145,9 @@ def find_and_remove(args):
             page_content = extract_from_txt(page_path)
             text = " ".join([line.split("\t")[0] for line in page_content])
             
-            abstract_idx = find_abstract_span(text, abstract_text)
+            abstract_idx = find_abstract_span(
+                text, abstract_text, args.max_l_dist
+            )
             if not abstract_idx: 
                 continue 
             else:
@@ -203,6 +219,12 @@ if __name__ == "__main__":
         type=str,
         required=True,
     )
+    # parser.add_argument(
+    #     "--dataset_type",
+    #     type=str,
+    #     required=True,
+    #     help="arXiv, PubMed or HAL."
+    # )
     parser.add_argument(
         "--n_docs", 
         type=int,

@@ -2,3 +2,6 @@ lxml
 pdf2image
 tqdm 
 Pillow
+natsort
+regex
+fuzzysearch

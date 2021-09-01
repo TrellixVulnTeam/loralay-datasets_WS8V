@@ -4,11 +4,12 @@ import time
 import os
 import shutil
 import subprocess
+from subprocess import PIPE
 import re
 import xml.etree.ElementTree as ET
 import urllib.request 
 from tqdm import tqdm
-from utils import get_ids, remove_downloaded_from_id_list
+from utils import get_ids, remove_processed_from_id_list
 
 
 def matches_first_id_scheme(id):
@@ -37,16 +38,39 @@ def extract_pdf(arxiv_id, pdf_output_path):
     """
     m = matches_first_id_scheme(arxiv_id)
     if m:
-        command = "gsutil cp gs://arxiv-dataset/arxiv/" \
-            f"{m.group(1)}/pdf/{m.group(2)[:4]}/{m.group(2)}v1.pdf " \
-            f"{pdf_output_path}"
+        command = [
+            "gsutil", 
+            "ls",
+            f"gs://arxiv-dataset/arxiv/{m.group(1)}/pdf/{m.group(2)[:4]}/{m.group(2)}v*.pdf"
+        ]
     else:
         p = re.compile("^(\d{4})\.(\d{4,5})$")
         m = p.match(arxiv_id)
         assert m, print(arxiv_id)
-        command = "gsutil cp gs://arxiv-dataset/arxiv/" \
-            f"arxiv/pdf/{m.group(1)}/{arxiv_id}v1.pdf " \
-            f"{pdf_output_path}"
+        command = [
+            "gsutil",
+            "ls",
+            f"gs://arxiv-dataset/arxiv/arxiv/pdf/{m.group(1)}/{arxiv_id}v*.pdf"
+        ]
+
+    p = subprocess.Popen(command, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    output, err = p.communicate()
+
+    versions = output.decode("utf-8").split("\n")
+    versions = [v for v in versions if v] # remove empty string
+    print(versions)
+    if m:
+        sorted_versions = sorted(
+            versions, 
+            key=lambda x: int(re.match(".*" + re.escape(m.group(2)) + "v([0-9]+).pdf", x).group(1))
+        )
+    else:
+        sorted_versions = sorted(
+            versions, 
+            key=lambda x: int(re.match(".*" + re.escape(arxiv_id) + "v([0-9]+).pdf", x).group(1))
+        )
+
+    command = f"gsutil cp {sorted_versions[-1]} {pdf_output_path}"
 
     subprocess.call(command, shell=True)
 
@@ -86,7 +110,7 @@ def extract(args):
     id_list = get_ids(args.input_file, args.n_docs)
 
     if args.resume_download:
-        id_list = remove_downloaded_from_id_list(
+        id_list = remove_processed_from_id_list(
             id_list, args.downloaded_output_log, args.failed_output_log
         )
 

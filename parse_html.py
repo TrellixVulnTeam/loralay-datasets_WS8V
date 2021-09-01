@@ -72,9 +72,11 @@ def parse(args):
     fnames = sorted(os.listdir(args.html_dir))
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
-    if args.resume_parsing:
+    if args.resume:
         print("Resuming parsing...")
-        fnames = remove_processed_from_id_list(fnames, args.parsed_output_log)
+        fnames = remove_processed_from_id_list(
+            fnames, args.parsed_output_log, args.failed_output_log
+        )
         if not fnames:
             print(f"All documents in {args.input_file} have already been parsed")
             return
@@ -151,7 +153,7 @@ if __name__ == "__main__":
         default="./parsed.log"
     )
     parser.add_argument(
-        "--resume_parsing", 
+        "--resume", 
         action="store_true", 
         help="Resume download."
     )
@@ -163,12 +165,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.resume_parsing and args.overwrite_output_dir:
+    if args.resume and args.overwrite_output_dir:
         raise ValueError(
-            f"Cannot use --resume_parsing and --overwrite_output_dir at the same time."
+            f"Cannot use --resume and --overwrite_output_dir at the same time."
         )
 
-    if os.listdir(args.output_dir) and not args.resume_parsing:
+    if os.listdir(args.output_dir) and not args.resume:
         if args.overwrite_output_dir:
             print(f"Overwriting {args.output_dir}")
             shutil.rmtree(args.output_dir)

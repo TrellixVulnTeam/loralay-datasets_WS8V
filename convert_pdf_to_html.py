@@ -44,12 +44,18 @@ def convert(args):
     fnames = sorted(os.listdir(pdf_path))
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
-    if args.resume_conversion:
+    if args.resume:
+        ext = ".html"
+        fnames = [fname[:-len(ext)] for fname in fnames]
         print("Resuming conversion...")
-        fnames = remove_processed_from_id_list(fnames, args.converted_output_log)
+        fnames = remove_processed_from_id_list(
+            fnames, args.converted_output_log, args.failed_output_log
+        )
         if not fnames:
             print(f"All documents in {pdf_path} have already been converted to HTML")
             return
+        fnames = [fname + ext for fname in fnames]
+        
 
     for filename in tqdm(fnames, desc=f"Processing PDFs in {pdf_path}"):
         output_fname = filename[:-4] + ".html"
@@ -99,7 +105,7 @@ if __name__ == "__main__":
         default="./failed_to_convert_html.log"
     )
     parser.add_argument(
-        "--resume_conversion", 
+        "--resume", 
         action="store_true", 
         help="Resume download."
     )
@@ -111,9 +117,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.resume_conversion and args.overwrite_output_dir:
+    if args.resume and args.overwrite_output_dir:
         raise ValueError(
-            f"Cannot use --resume_conversion and --overwrite_output_dir at the same time."
+            f"Cannot use --resume and --overwrite_output_dir at the same time."
         )
 
     if args.use_docker:
@@ -121,7 +127,7 @@ if __name__ == "__main__":
     else:
         output_dir = args.output_folder
 
-    if os.listdir(output_dir) and not args.resume_conversion:
+    if os.listdir(output_dir) and not args.resume:
         if args.overwrite_output_dir:
             print(f"Overwriting {output_dir}")
             shutil.rmtree(output_dir)
