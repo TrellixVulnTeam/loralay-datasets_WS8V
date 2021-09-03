@@ -21,9 +21,8 @@ lang_to_code = {
     'thai': 'th',
 }
 
-def get_ids_and_url_mapping(input_file, limit):
+def get_ids(input_file, limit):
     id_list = []
-    id_to_url = {}
     num_processed = 0
     with open(input_file, "r") as f:
         for line in f:
@@ -33,14 +32,23 @@ def get_ids_and_url_mapping(input_file, limit):
             doc_id = title + "-" + lang_code
             if doc_id not in id_list:
                 id_list.append(doc_id)
-                id_to_url[doc_id] = item["document_url"]
                 num_processed += 1
                 if num_processed == limit:
                     break
-    return (id_list, id_to_url)
+    return id_list
+
+def create_title_to_rev_dict(mapping_file):
+    title_to_revision = dict()
+
+    with open(mapping_file, "r") as f:
+        for line in f:
+            title, revision_id = line.split("\t")
+            title_to_revision[title] = revision_id.rstrip()
+
+    return title_to_revision
 
 def extract(args):
-    id_list, id_to_url = get_ids_and_url_mapping(args.input_file, args.n_docs)
+    id_list = get_ids(args.input_file, args.n_docs)
 
     if args.resume:
         id_list = remove_processed_from_id_list(
@@ -51,15 +59,29 @@ def extract(args):
             print("Resuming download...")
             print(f"All documents in {args.input_file} have already been extracted")
             return 
-            
+
+    title_to_revision_id = dict()     
+    for mapping_file in os.listdir(args.mapping_folder):
+        lang_code = mapping_file.replace(".txt", "")
+        mapping_path = os.path.join(args.mapping_folder, mapping_file)
+        title_to_revision_id[lang_code] = create_title_to_rev_dict(mapping_path)
 
     print(f"Extracting {len(id_list)} articles from TyDiQA, using IDs in {args.input_file}")
 
     for doc_id in tqdm(id_list):
-        # title, lang = doc_id.rsplit("-", 1)
+        title, lang = doc_id.rsplit("-", 1)
         pdf_output_path = os.path.join(args.pdf_output_dir, doc_id + ".pdf")
+        
+        # wikipedia.set_lang(lang)
+        # page = wikipedia.page(title=title, auto_suggest=False)
+    
+        if lang == "en":
+            url = f"https://{lang}.wikipedia.org/w/index.php?title={title}"
+        else:
+            revision_id = title_to_revision_id[lang][title]
+            url = f"https://{lang}.wikipedia.org/w/index.php?title={title}&oldid={revision_id}"
 
-        pdfkit.from_url(id_to_url[doc_id], pdf_output_path, options={'quiet': ''})
+        pdfkit.from_url(url, pdf_output_path, options={'quiet': ''})
 
         if os.path.exists(pdf_output_path):
             with open(args.downloaded_output_log, "a") as f:

@@ -22,7 +22,7 @@ def find_word_idx_for_span(text, start_idx, end_idx):
 
     return (abstract_idx[0], abstract_idx[-1])
 
-def find_abstract_span(text, abstract_text, max_l_dist):
+def find_abstract_span(text, abstract_text, max_l_dist=15):
     start_idx = text.find(abstract_text)
     
     if start_idx != -1:
@@ -48,15 +48,6 @@ def find_abstract_span(text, abstract_text, max_l_dist):
 
         abstract_idx = find_word_idx_for_span(text, start_idx, end_idx)
         return abstract_idx
-
-    # if dataset_type == "arxiv":
-    #     words = text.split()
-    #     words = [w.lower() for w in words] # first sections in arxiv are generally named introduction
-        
-    #     if "introduction" in words:
-    #         end_idx = words.index("introduction") - 1
-    #         print(end_idx)
-    #         return (0, end_idx)
 
     return None 
 
