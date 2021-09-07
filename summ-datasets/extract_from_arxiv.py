@@ -3,6 +3,7 @@ import argparse
 import time
 import os
 import shutil
+from tqdm import tqdm
 import subprocess
 from subprocess import PIPE
 import re
@@ -38,7 +39,8 @@ def extract_pdf(arxiv_id, pdf_output_path):
     m = matches_first_id_scheme(arxiv_id)
     if m:
         command = [
-            "gsutil", 
+            "gsutil",
+            "-q",
             "ls",
             f"gs://arxiv-dataset/arxiv/{m.group(1)}/pdf/{m.group(2)[:4]}/{m.group(2)}v*.pdf"
         ]
@@ -48,6 +50,7 @@ def extract_pdf(arxiv_id, pdf_output_path):
         assert m, print(arxiv_id)
         command = [
             "gsutil",
+            "-q",
             "ls",
             f"gs://arxiv-dataset/arxiv/arxiv/pdf/{m.group(1)}/{arxiv_id}v*.pdf"
         ]
@@ -68,7 +71,7 @@ def extract_pdf(arxiv_id, pdf_output_path):
             key=lambda x: int(re.match(".*" + re.escape(arxiv_id) + "v([0-9]+).pdf", x).group(1))
         )
 
-    command = f"gsutil cp {sorted_versions[-1]} {pdf_output_path}"
+    command = f"gsutil -q cp {sorted_versions[-1]} {pdf_output_path}"
 
     subprocess.call(command, shell=True)
 
@@ -89,11 +92,10 @@ def extract_abstract(url):
     tree = ET.fromstring(response)
     if not tree:
         return None 
-    print(url)    
     node = tree.find(
         ".//pns:metadata", 
         namespaces={"pns": "http://www.openarchives.org/OAI/2.0/"}
-    ).getchildren()[0]
+    )[0]
     if not node:
         return None
     
@@ -120,7 +122,7 @@ def extract(args):
 
     start = None
 
-    for arxiv_id in id_list:
+    for arxiv_id in tqdm(id_list):
         failed_extraction = False
 
         pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
