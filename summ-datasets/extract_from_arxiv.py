@@ -68,6 +68,10 @@ def extract_pdf(arxiv_id, pdf_output_path):
 
     versions = output.decode("utf-8").split("\n")
     versions = [v for v in versions if v] # remove empty string
+
+    if len(versions) == 0:
+        return False
+
     if m:
         sorted_versions = sorted(
             versions, 
