@@ -137,7 +137,7 @@ def extract(args):
 
                 extracted_id_list.remove(metadata_id)
                 with open(args.downloaded_output_log, "a") as f:
-                    f.write(arxiv_id + "\n")
+                    f.write(metadata_id + "\n")
 
                 if not extracted_id_list:
                     break 
