@@ -29,10 +29,11 @@ def pdf2flowhtml(
             os.path.join(output_folder, outputfile)
         )
     
-    if subprocess.check_output(command, shell=True):
-        return False 
-    else:
+    try: 
+        subprocess.check_output(command, shell=True)
         return True
+    except subprocess.CalledProcessError as e:
+        return False
 
 
 def convert(args):
@@ -42,6 +43,8 @@ def convert(args):
         pdf_path = args.pdf_folder
     fnames = sorted(os.listdir(pdf_path))
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
+
+    print(fnames)
 
     if args.resume:
         ext = ".pdf"
@@ -58,12 +61,14 @@ def convert(args):
 
     for filename in tqdm(fnames, desc=f"Processing PDFs in {pdf_path}"):
         output_fname = filename[:-4] + ".html"
-        pdf2flowhtml(
+        if pdf2flowhtml(
             args.input_dir, args.pdf_folder, filename, args.output_folder, output_fname, args.use_docker
-        )
-        with open(args.converted_output_log, "a") as f:
-            f.write(filename[:-4] + "\n")
-
+        ):
+            with open(args.converted_output_log, "a") as f:
+                f.write(filename[:-4] + "\n")
+        else:
+            with open(args.failed_output_log, "a") as f:
+                f.write(filename[:-4] + "\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -96,6 +101,11 @@ if __name__ == "__main__":
         "--converted_output_log",
         type=str,
         default="./converted_to_html.log"
+    )
+    parser.add_argument(
+        "--failed_output_log",
+        type=str,
+        default="./failed_pdf_to_html.log"
     )
     parser.add_argument(
         "--resume", 

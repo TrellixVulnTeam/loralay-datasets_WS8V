@@ -49,6 +49,8 @@ def create_title_to_rev_dict(mapping_file):
 
 def extract(args):
     id_list = get_ids(args.input_file, args.n_docs)
+    id_list = list(set(id_list))
+    print(len(id_list))
 
     if args.resume:
         id_list = remove_processed_from_id_list(
@@ -61,9 +63,9 @@ def extract(args):
             return 
 
     title_to_revision_id = dict()     
-    for mapping_file in os.listdir(args.mapping_folder):
+    for mapping_file in os.listdir(args.mapping_dir):
         lang_code = mapping_file.replace(".txt", "")
-        mapping_path = os.path.join(args.mapping_folder, mapping_file)
+        mapping_path = os.path.join(args.mapping_dir, mapping_file)
         title_to_revision_id[lang_code] = create_title_to_rev_dict(mapping_path)
 
     print(f"Extracting {len(id_list)} articles from TyDiQA, using IDs in {args.input_file}")
@@ -75,13 +77,23 @@ def extract(args):
         # wikipedia.set_lang(lang)
         # page = wikipedia.page(title=title, auto_suggest=False)
     
-        if lang == "en":
+        if lang not in title_to_revision_id.keys():
             url = f"https://{lang}.wikipedia.org/w/index.php?title={title}"
         else:
             revision_id = title_to_revision_id[lang][title]
             url = f"https://{lang}.wikipedia.org/w/index.php?title={title}&oldid={revision_id}"
 
-        pdfkit.from_url(url, pdf_output_path, options={'quiet': ''})
+        try:
+            pdfkit.from_url(
+                url, 
+                pdf_output_path, 
+                options={
+                    'quiet': '',
+                    'load-error-handling': 'ignore'
+                },
+            )
+        except OSError:
+            print(f"Could not extract article at url {url}")
 
         if os.path.exists(pdf_output_path):
             with open(args.downloaded_output_log, "a") as f:
@@ -95,6 +107,11 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--input_file", 
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "--mapping_dir", 
         type=str,
         required=True,
     )

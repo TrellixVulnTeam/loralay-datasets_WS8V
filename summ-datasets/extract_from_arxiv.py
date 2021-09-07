@@ -1,18 +1,23 @@
 
 import argparse
-import time
 import os
-import shutil
 from tqdm import tqdm
 import subprocess
 from subprocess import PIPE
 import re
+import json
 import xml.etree.ElementTree as ET
-import urllib.request 
-from src.utils import get_ids_from_arxiv_or_pubmed, remove_processed_from_id_list
+from pylatexenc.latex2text import LatexNodes2Text 
+from src.utils import (
+    del_file_if_exists,
+    get_ids_from_arxiv_or_pubmed, 
+    remove_processed_from_id_list,
+    del_file_if_exists,
+    overwrite_dir_if_exists
+)
 
 
-def matches_first_id_scheme(id):
+def matches_first_id_scheme(id, reverse=False):
     """ Checks if id matches identifier scheme used until March 2007 
             e.g. astro-ph9702020
 
@@ -22,7 +27,10 @@ def matches_first_id_scheme(id):
     Returns:
         bool: True if id matches scheme, False otherwise
     """
-    p = re.compile("^([a-z\-]*)(\d{7})$")
+    if reverse:
+        p = re.compile("^([a-z\-]*)\/(\d{7})$")    
+    else:
+        p = re.compile("^([a-z\-]*)(\d{7})$")
     m = p.match(id)
     return m
 
@@ -79,33 +87,6 @@ def extract_pdf(arxiv_id, pdf_output_path):
         return True 
     return False
 
-def extract_abstract(url):
-    """ Extract abstract using OAI-PMH
-
-    Args:
-        url (string): URL providing metadata for an article 
-
-    Returns:
-        string: Text from abstract
-    """
-    response = urllib.request.urlopen(url).read()
-    tree = ET.fromstring(response)
-    if not tree:
-        return None 
-    node = tree.find(
-        ".//pns:metadata", 
-        namespaces={"pns": "http://www.openarchives.org/OAI/2.0/"}
-    )[0]
-    if not node:
-        return None
-    
-    abstract_text = node.find(
-        "./pns:abstract", 
-        namespaces={"pns": "http://arxiv.org/OAI/arXiv/"}
-    ).text
-
-    return abstract_text
-
 def extract(args):
     id_list = get_ids_from_arxiv_or_pubmed(args.input_file, args.n_docs)
 
@@ -120,51 +101,50 @@ def extract(args):
 
     print(f"Extracting {len(id_list)} articles from arXiv, using IDs in {args.input_file}")
 
-    start = None
+    extracted_id_list = []
 
     for arxiv_id in tqdm(id_list):
-        failed_extraction = False
-
         pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
         pdf_extracted = extract_pdf(arxiv_id, pdf_output_path)
-
-        m = matches_first_id_scheme(arxiv_id)
-        if m:
-            url = f"http://export.arxiv.org/oai2?verb=GetRecord&identifier=oai:arXiv.org:{m.group(1)}/{m.group(2)}&metadataPrefix=arXiv"
+        
+        if pdf_extracted:
+            extracted_id_list.append(arxiv_id)
         else:
-            url = f"http://export.arxiv.org/oai2?verb=GetRecord&identifier=oai:arXiv.org:{arxiv_id}&metadataPrefix=arXiv"
-        
-        
-        if start:
-            stop = time.time()
-            time_between_requests = stop - start 
-            if time_between_requests < 3:
-                time.sleep(3 - time_between_requests)
-
-        abstract_text = extract_abstract(url)
-        start = time.time()
-
-        if abstract_text: 
-            if pdf_extracted: # abstract and pdf exist: save abstract
-                abstract_output_path = os.path.join(args.abstract_output_dir, arxiv_id + ".txt")
-                with open(abstract_output_path, "w") as fw:
-                    abstract_words = abstract_text.strip().split()
-                    for w in abstract_words:
-                        fw.write(w + "\n")
-            else: 
-                failed_extraction = True
-        else:
-            failed_extraction = True
-            if pdf_extracted: # pdf has been extracted, delete it
-                os.remove(pdf_output_path)
-        
-    
-        if failed_extraction:
             with open(args.failed_output_log, "a") as f:
                 f.write(arxiv_id + "\n")
-        else:
-            with open(args.downloaded_output_log, "a") as f:
-                f.write(arxiv_id + "\n")
+
+    with open(args.metadata_file, "r") as f:
+        for line in tqdm(f):
+            metadata = json.loads(line)
+            m = matches_first_id_scheme(metadata["id"], reverse=True)
+            if m:
+                metadata_id = metadata["id"].replace("/", "")
+            else:
+                metadata_id = metadata["id"]
+            if metadata_id in extracted_id_list:
+                abstract_text = metadata["abstract"].replace("\n", " ")
+                abstract_text = LatexNodes2Text().latex_to_text(abstract_text)
+                with open(args.abstract_output_path, 'a') as outfile:
+                    json.dump(
+                        {"id": metadata_id, "abstract": abstract_text}, 
+                        outfile
+                    )
+                    outfile.write('\n')
+
+                extracted_id_list.remove(metadata_id)
+                with open(args.downloaded_output_log, "a") as f:
+                    f.write(arxiv_id + "\n")
+
+                if not extracted_id_list:
+                    break 
+    
+    for arxiv_id in extracted_id_list: # remove articles whose abstracts have not been extracted
+        pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
+        print(f"Abstract not found for article {arxiv_id}: deleting {pdf_output_path}")
+        os.remove(pdf_output_path)
+
+        with open(args.failed_output_log, "a") as f:
+            f.write(arxiv_id + "\n")
 
 
 if __name__ == "__main__":
@@ -174,6 +154,13 @@ if __name__ == "__main__":
         "--input_file", 
         type=str,
         required=True,
+        help="The input file containing the IDs to extract."
+    )
+    parser.add_argument(
+        "--metadata_file", 
+        type=str,
+        required=True,
+        help="The metadata file containing the abstracts to extract."
     )
     parser.add_argument(
         "--pdf_output_dir", 
@@ -181,7 +168,7 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "--abstract_output_dir", 
+        "--abstract_output_path", 
         type=str,
         required=True,
     )
@@ -218,30 +205,20 @@ if __name__ == "__main__":
             f"Cannot use --resume and --overwrite_output_dir at the same time."
         )
 
-    if (os.listdir(args.pdf_output_dir) or os.listdir(args.abstract_output_dir)) and not args.resume:
-        if args.overwrite_output_dir:
-            for output_dir in [
-                args.pdf_output_dir, args.abstract_output_dir
-            ]:
-                if os.listdir(output_dir):
-                    print(f"Overwriting {output_dir}")
-                    shutil.rmtree(output_dir)
-                    os.makedirs(output_dir)
-
-            if os.path.isfile(args.downloaded_output_log):
-                print(f"Overwriting {args.downloaded_output_log}")
-                os.remove(args.downloaded_output_log)
-            if os.path.isfile(args.failed_output_log):
-                print(f"Overwriting {args.failed_output_log}")
-                os.remove(args.failed_output_log)
+    if (os.listdir(args.pdf_output_dir) or os.path.exists(args.abstract_output_path)) and not args.resume:
+        if args.overwrite_output_dir: 
+            overwrite_dir_if_exists(args.pdf_output_dir)
+            del_file_if_exists(args.abstract_output_path)
+            del_file_if_exists(args.downloaded_output_log)
+            del_file_if_exists(args.failed_output_log)
         else:
             if os.listdir(args.pdf_output_dir):
                 raise ValueError(
                     f"Output directory ({args.pdf_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
                 )
-            if os.listdir(args.abstract_output_dir):
+            if os.path.exists(args.abstract_output_path):
                 raise ValueError(
-                    f"Output directory ({args.abstract_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
+                    f"Output file ({args.abstract_output_path}) already exists and is not empty. Use --overwrite_output_dir to overcome."
                 )
 
     extract(args)

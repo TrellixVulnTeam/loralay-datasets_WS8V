@@ -6,3 +6,4 @@ natsort
 regex
 fuzzysearch
 pdfkit
+pylatexenc

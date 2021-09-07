@@ -1,6 +1,19 @@
 import json
 import os 
 import tarfile
+import shutil
+
+def del_file_if_exists(path_to_file):
+    if os.path.isfile(path_to_file):
+        print(f"Overwriting {path_to_file}")
+        os.remove(path_to_file)
+
+def overwrite_dir_if_exists(path_to_dir):
+    if os.listdir(path_to_dir):
+        print(f"Overwriting {path_to_dir}")
+        shutil.rmtree(path_to_dir)
+        os.makedirs(path_to_dir)
+
 
 def get_ids_from_arxiv_or_pubmed(input_file, limit):
     id_list = []

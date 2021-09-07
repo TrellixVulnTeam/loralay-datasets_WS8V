@@ -1,11 +1,22 @@
 import argparse 
 import os 
-import shutil
 import subprocess
 import tarfile 
+import json
+from tqdm import tqdm
 import xml.etree.ElementTree as ET
 import urllib.request
-from src.utils import get_ids_from_arxiv_or_pubmed, remove_processed_from_id_list
+import logging
+from pylatexenc.latex2text import LatexNodes2Text 
+from src.utils import (
+    del_file_if_exists,
+    get_ids_from_arxiv_or_pubmed, 
+    remove_processed_from_id_list,
+    del_file_if_exists,
+    overwrite_dir_if_exists
+)
+
+logging.disable(logging.CRITICAL)
 
 def extract_abstract(url):
     """ Extract abstract using the BioC API
@@ -35,7 +46,7 @@ def extract_pdf_from_pdf_url(url, output_path):
     Returns:
         bool: True if extraction was successful, False otherwise
     """
-    command = f"wget -O {output_path} {url}"
+    command = f"wget -q -O {output_path} {url}"
     subprocess.call(command, shell=True)
     
     if os.path.exists(output_path):
@@ -53,7 +64,7 @@ def extract_pdf_from_tar_url(url, output_path, tar_path):
     Returns:
         bool: True if extraction was successful, False otherwise
     """
-    command = f"wget -O {tar_path} {url}"
+    command = f"wget -q -O {tar_path} {url}"
     subprocess.call(command, shell=True)
 
     tar = tarfile.open(tar_path)
@@ -102,7 +113,7 @@ def extract(args):
 
     print(f"Extracting {len(id_list)} articles from PubMed, using IDs in {args.input_file}")
     
-    for pmcid in id_list:
+    for pmcid in tqdm(id_list):
         failed_extraction = False
 
         oa_url = f"https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id={pmcid}"
@@ -114,7 +125,7 @@ def extract(args):
         elif ".pdf" in ftp_url:
             pdf_extracted = extract_pdf_from_pdf_url(ftp_url, output_path)
         else:
-            tar_path = os.path.join(args.tmp_output_dir, pmcid + ".tar.gz")
+            tar_path = os.path.join(args.extract_output_dir, pmcid + ".tar.gz")
 
             pdf_extracted = extract_pdf_from_tar_url(ftp_url, output_path, tar_path)
 
@@ -123,11 +134,13 @@ def extract(args):
                 f"https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_xml/{pmcid}/unicode"
             )
             if abstract_text: 
-                abstract_output_path = os.path.join(args.abstract_output_dir, pmcid + ".txt")
-                with open(abstract_output_path, "w") as fw:
-                    abstract_words = abstract_text.strip().split()
-                    for w in abstract_words:
-                        fw.write(w + "\n")
+                abstract_text = LatexNodes2Text().latex_to_text(abstract_text.replace("\n", " "))
+                with open(args.abstract_output_path, "a") as outfile:
+                    json.dump(
+                        {"id": pmcid, "abstract": abstract_text}, 
+                        outfile
+                    )
+                    outfile.write('\n')
             else:
                 failed_extraction = True 
                 os.remove(output_path) # pdf has been extracted, delete it
@@ -149,6 +162,7 @@ if __name__ == "__main__":
         "--input_file", 
         type=str,
         required=True,
+        help="The input file containing the IDs to extract."
     )
     parser.add_argument(
         "--pdf_output_dir", 
@@ -156,12 +170,12 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "--abstract_output_dir", 
+        "--abstract_output_path", 
         type=str,
         required=True,
     )
     parser.add_argument(
-        "--tmp_output_dir", 
+        "--extract_output_dir", 
         type=str,
         default="./tmp",
     )
@@ -198,34 +212,27 @@ if __name__ == "__main__":
             f"Cannot use --resume and --overwrite_output_dir at the same time."
         )
 
-    if os.listdir(args.pdf_output_dir) and not args.resume:
+    if (
+        os.listdir(args.pdf_output_dir) or os.path.exists(args.abstract_output_path) or os.path.exists(args.extract_output_dir)
+    ) and not args.resume:
         if args.overwrite_output_dir:
-            for output_dir in [
-                args.pdf_output_dir, args.abstract_output_dir, args.tmp_output_dir
-            ]:
-                if os.listdir(output_dir):
-                    print(f"Overwriting {output_dir}")
-                    shutil.rmtree(output_dir)
-                    os.makedirs(output_dir)
-
-            if os.path.isfile(args.downloaded_output_log):
-                print(f"Overwriting {args.downloaded_output_log}")
-                os.remove(args.downloaded_output_log)
-            if os.path.isfile(args.failed_output_log):
-                print(f"Overwriting {args.failed_output_log}")
-                os.remove(args.failed_output_log)
+            overwrite_dir_if_exists(args.pdf_output_dir)
+            overwrite_dir_if_exists(args.extract_output_dir)
+            del_file_if_exists(args.abstract_output_path)
+            del_file_if_exists(args.downloaded_output_log)
+            del_file_if_exists(args.failed_output_log)
         else:
             if os.listdir(args.pdf_output_dir):
                 raise ValueError(
                     f"Output directory ({args.pdf_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
                 )
-            if os.listdir(args.abstract_output_dir):
+            if os.path.exists(args.abstract_output_path):
                 raise ValueError(
-                    f"Output directory ({args.abstract_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
+                    f"Output file ({args.abstract_output_path}) already exists and is not empty. Use --overwrite_output_dir to overcome."
                 )
-            if os.listdir(args.tmp_output_dir):
+            if os.listdir(args.extract_output_dir):
                 raise ValueError(
-                    f"Output directory ({args.tmp_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
+                    f"Output directory ({args.extract_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
                 )
 
     extract(args)

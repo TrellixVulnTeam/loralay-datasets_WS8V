@@ -14,13 +14,15 @@ $ pip install -r requirements.txt
 
 PDFs are extracted based on IDs contained in the original data files (downloaded from https://github.com/armancohan/long-summarization). 
 
-Raw abstracts are retrieved using OAI-PMH for arXiv, and the PMC OAI service for PubMed. 
+For ArXiv, raw abstracts are contained in a separate metadatafile (downloaded from https://www.kaggle.com/Cornell-University/arxiv). For PubMed, they are retrieved using the PMC OAI service. 
+
 
 To extract from ArXiv:
 ~~~shell
 $ python extract_from_arxiv.py --input_file path/to/original/data/file \
+                               --metadata_file path/to/metadata/file \
                                --pdf_output_dir path/to/pdf/output/dir \
-                               --abstract_output_dir path/to/abstract/output/dir \
+                               --abstract_output_path path/to/abstract/output/file \
                                --n_docs num_docs_to_process # -1 to process every document
 ~~~
 
@@ -28,7 +30,7 @@ To extract from PubMed:
 ~~~shell
 $ python extract_from_pubmed.py --input_file path/to/original/data/file \
                                 --pdf_output_dir path/to/pdf/output/dir \
-                                --abstract_output_dir path/to/abstract/output/dir \
+                                --abstract_output_path path/to/abstract/output/file \
                                 --n_docs num_docs_to_process # -1 to process every document
 ~~~
 
