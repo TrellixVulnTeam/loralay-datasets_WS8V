@@ -3,7 +3,7 @@
 ## Environment Setup 
 
 ~~~shell
-$ conda create -n summ-datasets python=3.8
+$ conda create -n di-benchmark python=3.8
 $ conda activate summ-datasets 
 $ git clone ssh://git@source.recital.ai:2222/research/doc-intelligence/summ-datasets.git
 $ cd summ-datasets
