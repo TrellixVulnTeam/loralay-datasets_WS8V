@@ -103,6 +103,7 @@ def extract(args):
     id_list = get_ids_from_arxiv_or_pubmed(args.input_file, args.n_docs)
 
     if args.resume:
+        print("Resuming extraction...")
         id_list = remove_processed_from_id_list(
             id_list, args.downloaded_output_log, args.failed_output_log
         )
@@ -112,6 +113,7 @@ def extract(args):
             return 
 
     print(f"Extracting {len(id_list)} articles from PubMed, using IDs in {args.input_file}")
+    num_fails = 0
     
     for pmcid in tqdm(id_list):
         failed_extraction = False
@@ -148,12 +150,14 @@ def extract(args):
             failed_extraction = True
 
         if failed_extraction:
+            num_fails += 1
             with open(args.failed_output_log, "a") as f:
                 f.write(pmcid + "\n")
         else:
             with open(args.downloaded_output_log, "a") as f:
                 f.write(pmcid + "\n")
         
+    print(f"Extracted abstract and PDF for {len(id_list) - num_fails}/{len(id_list)} articles.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

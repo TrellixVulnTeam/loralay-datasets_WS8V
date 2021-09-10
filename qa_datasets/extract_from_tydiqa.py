@@ -50,7 +50,6 @@ def create_title_to_rev_dict(mapping_file):
 def extract(args):
     id_list = get_ids(args.input_file, args.n_docs)
     id_list = list(set(id_list))
-    print(len(id_list))
 
     if args.resume:
         id_list = remove_processed_from_id_list(
@@ -69,6 +68,8 @@ def extract(args):
         title_to_revision_id[lang_code] = create_title_to_rev_dict(mapping_path)
 
     print(f"Extracting {len(id_list)} articles from TyDiQA, using IDs in {args.input_file}")
+
+    num_fails = 0
 
     for doc_id in tqdm(id_list):
         title, lang = doc_id.rsplit("-", 1)
@@ -99,8 +100,11 @@ def extract(args):
             with open(args.downloaded_output_log, "a") as f:
                 f.write(f"{doc_id}\n")
         else:
+            num_fails += 1
             with open(args.failed_output_log, "a") as f:
                 f.write(f"{doc_id}\n")
+
+    print(f"Extracted PDF for {len(id_list) - num_fails}/{len(id_list)} documents.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
