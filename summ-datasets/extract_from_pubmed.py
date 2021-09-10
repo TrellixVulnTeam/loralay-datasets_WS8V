@@ -15,6 +15,7 @@ from src.utils import (
     del_file_if_exists,
     overwrite_dir_if_exists
 )
+import zlib
 
 logging.disable(logging.CRITICAL)
 
@@ -68,7 +69,10 @@ def extract_pdf_from_tar_url(url, output_path, tar_path):
     subprocess.call(command, shell=True)
 
     tar = tarfile.open(tar_path)
-    pdf_fname = [t.name for t in tar.getmembers() if ".pdf" in t.name]
+    try:
+        pdf_fname = [t.name for t in tar.getmembers() if ".pdf" in t.name]
+    except zlib.error:
+        return False
 
     if len(pdf_fname) == 1:
         pdf_contents = tar.extractfile(pdf_fname[0]).read()
