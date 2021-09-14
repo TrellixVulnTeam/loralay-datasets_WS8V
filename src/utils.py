@@ -9,7 +9,7 @@ def del_file_if_exists(path_to_file):
         os.remove(path_to_file)
 
 def overwrite_dir_if_exists(path_to_dir):
-    if os.listdir(path_to_dir):
+    if os.path.exists(path_to_dir) and os.listdir(path_to_dir):
         print(f"Overwriting {path_to_dir}")
         shutil.rmtree(path_to_dir)
         os.makedirs(path_to_dir)
@@ -68,3 +68,25 @@ def compress_dir(tar_path, output_folder):
             output_folder, 
             arcname=os.path.basename(output_folder)
         ) 
+
+def get_doc_content(doc_path):
+    doc_content = []
+    with open(doc_path, 'r') as f:
+        for line in f:
+            content = line.split("\t")
+            word = content[0]
+            bbox = content[1:5]
+            page_width, page_height = content[5:7]
+            page_number = content[-1].rstrip()
+            doc_content.append([word, bbox, page_width, page_height, page_number])
+
+    return doc_content
+
+def get_abstract(abstract_path, doc_id):
+    with open(abstract_path, "r") as f:
+        for line in f:
+            item = json.loads(line)
+            if item["id"] == doc_id:
+                return item["abstract"] 
+    
+    return None

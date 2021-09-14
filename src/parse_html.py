@@ -84,15 +84,13 @@ def parse(args):
         html_path = os.path.join(args.html_dir, html)
         doc = extract_text_from_tree(html_path)
 
-        doc_id = html[:-5]
-        doc_output_dir = os.path.join(args.output_dir, doc_id)
-        os.makedirs(doc_output_dir)
+        doc_id = html.replace(".html", "")
 
-        for i, p in enumerate(doc):
-            output_file = os.path.join(
-                os.path.join(doc_output_dir, doc_id + "-" + str(i+1) + ".txt")
-            )
-            with open(output_file, "w", encoding="utf-8") as fw:
+        output_file = os.path.join(
+            os.path.join(args.output_dir, doc_id + ".txt")
+        )
+        with open(output_file, "w", encoding="utf-8") as fw:
+            for page_id, p in enumerate(doc):
                 for elem in p:
                     word = elem[0]
                     bbox = elem[1:5]
@@ -116,13 +114,10 @@ def parse(args):
                         + str(page_width) 
                         + "\t" 
                         + str(page_height) 
+                        + "\t"
+                        + str(page_id+1)
                         + "\n" 
                     )
-        # compress output txt files 
-        tar_path = doc_output_dir + ".tar.gz"
-        compress_dir(tar_path, doc_output_dir)
-        
-        shutil.rmtree(doc_output_dir)
 
         with open(args.parsed_output_log, "a") as f:
             f.write(doc_id + "\n")

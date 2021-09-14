@@ -52,12 +52,12 @@ def extract(args):
     id_list = list(set(id_list))
 
     if args.resume:
+        print("Resuming download...")
         id_list = remove_processed_from_id_list(
             id_list, args.downloaded_output_log, failed_log=args.failed_output_log
         )
 
         if not id_list:
-            print("Resuming download...")
             print(f"All documents in {args.input_file} have already been extracted")
             return 
 
@@ -81,8 +81,15 @@ def extract(args):
         if lang not in title_to_revision_id.keys():
             url = f"https://{lang}.wikipedia.org/w/index.php?title={title}"
         else:
-            revision_id = title_to_revision_id[lang][title]
-            url = f"https://{lang}.wikipedia.org/w/index.php?title={title}&oldid={revision_id}"
+            if title in title_to_revision_id[lang]:
+                revision_id = title_to_revision_id[lang][title]
+                url = f"https://{lang}.wikipedia.org/w/index.php?title={title}&oldid={revision_id}"
+            else:
+                print(f"Could not extract article at {title} (lang:{lang})")
+                num_fails += 1
+                with open(args.failed_output_log, "a") as f:
+                    f.write(f"{doc_id}\n")
+                continue
 
         try:
             pdfkit.from_url(

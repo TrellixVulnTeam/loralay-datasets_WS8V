@@ -1,13 +1,20 @@
-import argparse 
+import argparse
 import os 
 import shutil
 import natsort
-from tqdm import tqdm 
 import tarfile
+from tqdm import tqdm 
 import regex as re
 from fuzzysearch import find_near_matches 
 from PIL import Image, ImageDraw
-from utils import remove_processed_from_id_list, compress_dir
+from src.utils import (
+    remove_processed_from_id_list, 
+    compress_dir, 
+    get_abstract,
+    overwrite_dir_if_exists,
+    del_file_if_exists
+)
+
 
 def find_word_idx_for_span(text, start_idx, end_idx):
     new_splitted_text = (
@@ -56,7 +63,7 @@ def _update_text(page_path, doc_lines, abstract_span):
     with open(page_path, "w", encoding="utf-8") as f:
         for i, line in enumerate(doc_lines):
             if i < abstract_span[0] or i > abstract_span[1]:
-                f.write(line + "\n")
+                f.write(line)
 
 def _update_image(image_path, doc_lines, abstract_span):
     image = Image.open(image_path)
@@ -79,101 +86,148 @@ def _update_image(image_path, doc_lines, abstract_span):
     image.save(image_path)
     image.close()
 
-def update_page(
-    page_path, 
-    image_path, 
-    doc_lines, 
-    abstract_span,
-):
-    _update_text(page_path, doc_lines, abstract_span)
-    _update_image(image_path, doc_lines, abstract_span)
+# def update_page(
+#     page_path, 
+#     image_path, 
+#     doc_lines, 
+#     abstract_span,
+# ):
+#     _update_text(page_path, doc_lines, abstract_span)
+#     _update_image(image_path, doc_lines, abstract_span)
     
-def extract_from_txt(page_path):
-    with open(page_path, "r", encoding="utf-8") as f:
-        page_content = f.read().splitlines()
+# def extract_from_txt(page_path):
+#     with open(page_path, "r", encoding="utf-8") as f:
+#         page_content = f.read().splitlines()
 
-    return page_content
+#     return page_content
+
+def _update_and_save_txt(out_txt_path, in_txt_path, start_stop_indices):
+    with open(out_txt_path, "w") as fw:
+        with open(in_txt_path, "r") as f:
+            for i, line in enumerate(f):
+                if i < start_stop_indices[0] or i > start_stop_indices[1]:
+                    fw.write(line)
+
+
+def _update_and_save_img(
+    doc_id, 
+    in_img_tar, 
+    page_num, 
+    start_stop_indices,
+    pdf_size,
+    bboxes,
+    out_img_folder, 
+    out_img_tar, 
+):
+    with tarfile.open(in_img_tar) as tar:
+        tar.extractall(out_img_folder)
+
+    doc_out_img_folder = os.path.join(out_img_folder, doc_id)
+    image_page_path = os.path.join(
+        doc_out_img_folder,
+        f"{doc_id}-{page_num}.jpg"
+    )
+    image = Image.open(image_page_path)
+    draw = ImageDraw.Draw(image)
+    img_width, img_height = image.size
+    width, height = pdf_size
+    scale_w = img_width / width
+    scale_h = img_height / height
+
+    for i, box in enumerate(bboxes):
+        if i >= start_stop_indices[0] and i <= start_stop_indices[1]:
+            box = [int(b) for b in box]
+            scaled_box = [box[0] * scale_w, box[1] * scale_h, box[2] * scale_w, box[3] * scale_h]
+
+            draw.rectangle(scaled_box, fill="black")
+
+    image.save(image_page_path)
+    image.close()
+
+    compress_dir(out_img_tar, doc_out_img_folder)
+    shutil.rmtree(doc_out_img_folder)
+
 
 def find_and_remove(args):
-    doc_dirs = sorted(os.listdir(args.text_dir))
-    doc_dirs = doc_dirs[:args.n_docs] if args.n_docs > 0 else doc_dirs 
+    txt_fnames = sorted(os.listdir(args.text_dir))
+    txt_fnames = txt_fnames[:args.n_docs] if args.n_docs > 0 else txt_fnames 
 
     if args.resume_processing:
-        ext = ".tar.gz"
-        doc_dirs = [doc[:-len(ext)] for doc in doc_dirs]
+        txt_fnames = [fname[:-len(".txt")] for fname in txt_fnames]
         print("Resuming processing...")
-        doc_dirs = remove_processed_from_id_list(
-            doc_dirs, args.found_output_log, args.failed_output_log
+        txt_fnames = remove_processed_from_id_list(
+            txt_fnames, args.found_output_log, args.failed_output_log
         )
-        if not doc_dirs:
+        if not txt_fnames:
             print(f"All documents in {args.text_dir} have already been processed.")
             return 
-        doc_dirs = [doc + ext for doc in doc_dirs]
+        txt_fnames = [fname + ".txt" for fname in txt_fnames]
 
-    for doc_tar in tqdm(doc_dirs):
-        doc_id = doc_tar.replace(".tar.gz", "")
-        abstract_path = os.path.join(args.abstract_dir, doc_id + ".txt")
-        abstract_text = " ".join(extract_from_txt(abstract_path))
+    for txt_fname in tqdm(txt_fnames):
+        doc_id = txt_fname.replace(".txt", "")
+        abstract_text = get_abstract(args.abstract_path, doc_id) 
 
-        txt_tar_path = os.path.join(args.text_dir, doc_tar)
-        img_tar_path = os.path.join(args.img_dir, doc_tar)
+        doc_txt_path = os.path.join(args.text_dir, txt_fname)
+        img_tar = os.path.join(args.img_dir, doc_id + ".tar.gz")
 
-        with tarfile.open(txt_tar_path) as tar:
-            tar.extractall(args.output_text_dir) 
+        doc_out_txt_path = os.path.join(args.output_text_dir, txt_fname)
+        # doc_out_img_folder = os.path.join(args.output_img_dir, doc_id) # output folder where images are extracted
+        doc_out_img_tar = os.path.join(args.output_img_dir, doc_id + ".tar.gz")
 
-        # output folders where text and image are extracted
-        doc_txt_folder = os.path.join(args.output_text_dir, doc_id)
-        doc_img_folder = os.path.join(args.output_img_dir, doc_id)
+        with open(doc_txt_path) as f:
+            curr_page = []
+            curr_page_num = 1
 
-        pages = natsort.natsorted(os.listdir(doc_txt_folder))
+            abstract_found = False
+            offset = 0
 
-        abstract_found = False
+            for i, line in enumerate(f):
+                splits = line.split("\t")
+                text = splits[0]
+                page_num = splits[-1].rstrip()
 
-        for p in pages:
-            page_num = p.split("-")[-1].replace(".txt", "")
-            page_path = os.path.join(doc_txt_folder, p)
-
-            page_content = extract_from_txt(page_path)
-            text = " ".join([line.split("\t")[0] for line in page_content])
-            
-            abstract_idx = find_abstract_span(
-                text, abstract_text, args.max_l_dist
-            )
-            if not abstract_idx: 
-                continue 
-            else:
-                with tarfile.open(img_tar_path) as tar:
-                    tar.extractall(args.output_img_dir) 
-
-                image_page_path = os.path.join(
-                    doc_img_folder, 
-                    f"{doc_id}-{page_num}.jpg"
-                )
-
-                update_page(
-                    page_path, 
-                    image_page_path, 
-                    page_content, 
-                    abstract_idx,
-                )
-
-                abstract_found = True 
-                break
+                if page_num != curr_page_num:
+                    curr_text = " ".join([content[0] for content in curr_page])
+                    abstract_start_top_indices = find_abstract_span(
+                        curr_text, abstract_text, args.max_l_dist
+                    )
+                    if abstract_start_top_indices is not None:
+                        abstract_found = True 
+                        abstract_start_top_indices = (
+                            abstract_start_top_indices[0] + offset,
+                            abstract_start_top_indices[1] + offset,
+                        )
+                        break 
+                    else:
+                        curr_page = [splits]
+                        offset = i
+                        curr_page_num = page_num
+                else:
+                    curr_page.append(splits)
 
         if abstract_found:
-            output_img_tar_path = os.path.join(args.output_img_dir, doc_tar)
-            compress_dir(output_img_tar_path, doc_img_folder)
-            shutil.rmtree(doc_img_folder)
+            bboxes = [line[1:5] for line in curr_page]
+            pdf_size = (int(curr_page[0][5]), int(curr_page[0][6]))
+
+            _update_and_save_txt(
+                doc_out_txt_path, doc_txt_path, abstract_start_top_indices
+            )
+            _update_and_save_img(
+                doc_id, 
+                img_tar, 
+                curr_page_num, 
+                abstract_start_top_indices, 
+                pdf_size,
+                bboxes,
+                args.output_img_dir,
+                doc_out_img_tar 
+            )
 
             with open(args.found_output_log, "a") as f:
                 f.write(doc_id + "\n")
         else:
             with open(args.failed_output_log, "a") as f:
                 f.write(doc_id + "\n")
-
-        output_txt_tar_path = os.path.join(args.output_text_dir, doc_tar)
-        compress_dir(output_txt_tar_path, doc_txt_folder)
-        shutil.rmtree(doc_txt_folder)
 
 
 if __name__ == "__main__":
@@ -187,7 +241,7 @@ if __name__ == "__main__":
         help="The input data dir. Should contain the txt files.",
     )
     parser.add_argument(
-        "--abstract_dir",
+        "--abstract_path",
         default=None,
         type=str,
         required=True,
@@ -210,12 +264,6 @@ if __name__ == "__main__":
         type=str,
         required=True,
     )
-    # parser.add_argument(
-    #     "--dataset_type",
-    #     type=str,
-    #     required=True,
-    #     help="arXiv, PubMed or HAL."
-    # )
     parser.add_argument(
         "--n_docs", 
         type=int,
@@ -258,20 +306,10 @@ if __name__ == "__main__":
         and not args.resume_processing
     ):
         if args.overwrite_output_dir:
-            print(f"Overwriting {args.output_text_dir}")
-            shutil.rmtree(args.output_text_dir)
-            os.makedirs(args.output_text_dir)
-
-            print(f"Overwriting {args.output_img_dir}")
-            shutil.rmtree(args.output_img_dir)
-            os.makedirs(args.output_img_dir)
-
-            print(f"Overwriting {args.found_output_log}")
-            os.remove(args.found_output_log)
-
-            if os.path.isfile(args.failed_output_log):
-                print(f"Overwriting {args.failed_output_log}")
-                os.remove(args.failed_output_log)
+            overwrite_dir_if_exists(args.output_text_dir)
+            overwrite_dir_if_exists(args.output_img_dir)
+            del_file_if_exists(args.found_output_log)
+            del_file_if_exists(args.failed_output_log)
         else:
             if os.listdir(args.output_text_dir):
                 raise ValueError(

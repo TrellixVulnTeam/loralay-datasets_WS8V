@@ -44,8 +44,6 @@ def convert(args):
     fnames = sorted(os.listdir(pdf_path))
     fnames = fnames[:args.n_docs] if args.n_docs > 0 else fnames 
 
-    print(fnames)
-
     if args.resume:
         ext = ".pdf"
         fnames = [fname[:-len(ext)] for fname in fnames]

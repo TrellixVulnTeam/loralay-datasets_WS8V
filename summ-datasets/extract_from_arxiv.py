@@ -17,7 +17,7 @@ from src.utils import (
 )
 
 
-def matches_first_id_scheme(id, reverse=False):
+def matches_first_id_scheme(id):
     """ Checks if id matches identifier scheme used until March 2007 
             e.g. astro-ph9702020
 
@@ -27,10 +27,8 @@ def matches_first_id_scheme(id, reverse=False):
     Returns:
         bool: True if id matches scheme, False otherwise
     """
-    if reverse:
-        p = re.compile("^([a-z\-]*)\/(\d{7})$")    
-    else:
-        p = re.compile("^([a-z\-]*)(\d{7})$")
+    
+    p = re.compile("^([a-z\-]*)(\d{7})$")
     m = p.match(id)
     return m
 
@@ -95,6 +93,7 @@ def extract(args):
     id_list = get_ids_from_arxiv_or_pubmed(args.input_file, args.n_docs)
 
     if args.resume:
+        print("Resuming extraction...")
         id_list = remove_processed_from_id_list(
             id_list, args.downloaded_output_log, failed_log=args.failed_output_log
         )
@@ -105,51 +104,65 @@ def extract(args):
 
     print(f"Extracting {len(id_list)} articles from arXiv, using IDs in {args.input_file}")
 
-    extracted_id_list = []
+    # extracted_id_list = []
 
-    for arxiv_id in tqdm(id_list):
-        pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
-        pdf_extracted = extract_pdf(arxiv_id, pdf_output_path)
+    # for arxiv_id in tqdm(id_list):
+    #     pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
+    #     pdf_extracted = extract_pdf(arxiv_id, pdf_output_path)
         
-        if pdf_extracted:
-            extracted_id_list.append(arxiv_id)
-        else:
-            with open(args.failed_output_log, "a") as f:
-                f.write(arxiv_id + "\n")
+    #     if pdf_extracted:
+    #         extracted_id_list.append(arxiv_id)
+    #     else:
+    #         with open(args.failed_output_log, "a") as f:
+    #             f.write(arxiv_id + "\n")
+
+    remaining_ids = id_list.copy()
+    num_fails = 0
 
     with open(args.metadata_file, "r") as f:
         for line in tqdm(f):
             metadata = json.loads(line)
-            m = matches_first_id_scheme(metadata["id"], reverse=True)
-            if m:
-                metadata_id = metadata["id"].replace("/", "")
-            else:
-                metadata_id = metadata["id"]
-            if metadata_id in extracted_id_list:
-                abstract_text = metadata["abstract"].replace("\n", " ")
-                abstract_text = LatexNodes2Text().latex_to_text(abstract_text)
-                with open(args.abstract_output_path, 'a') as outfile:
-                    json.dump(
-                        {"id": metadata_id, "abstract": abstract_text}, 
-                        outfile
-                    )
-                    outfile.write('\n')
+            arxiv_id = metadata["id"].replace("/", "")
+            
+            if arxiv_id in id_list:
+                pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
+                pdf_extracted = extract_pdf(arxiv_id, pdf_output_path)
 
-                extracted_id_list.remove(metadata_id)
-                with open(args.downloaded_output_log, "a") as f:
-                    f.write(metadata_id + "\n")
+                if pdf_extracted: # pdf extracted -> save abstract
+                    abstract_text = metadata["abstract"].replace("\n", " ")
+                    abstract_text = LatexNodes2Text().latex_to_text(abstract_text)
+                    with open(args.abstract_output_path, 'a') as outfile:
+                        json.dump(
+                            {"id": arxiv_id, "abstract": abstract_text}, 
+                            outfile
+                        )
+                        outfile.write('\n')
 
-                if not extracted_id_list:
-                    break 
-    
-    for arxiv_id in extracted_id_list: # remove articles whose abstracts have not been extracted
-        pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
-        print(f"Abstract not found for article {arxiv_id}: deleting {pdf_output_path}")
-        os.remove(pdf_output_path)
+                    with open(args.downloaded_output_log, "a") as f:
+                        f.write(arxiv_id + "\n")
+                else: 
+                    num_fails += 1
+                    with open(args.failed_output_log, "a") as f:
+                        f.write(arxiv_id + "\n")
+                
+                remaining_ids.remove(arxiv_id)
 
+                if len(remaining_ids) == 0:
+                    break
+
+    for arxiv_id in remaining_ids: # articles whose abstracts have not been found
+        num_fails += 1
         with open(args.failed_output_log, "a") as f:
             f.write(arxiv_id + "\n")
+    # for arxiv_id in extracted_id_list: # remove articles whose abstracts have not been extracted
+    #     pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
+    #     print(f"Abstract not found for article {arxiv_id}: deleting {pdf_output_path}")
+    #     os.remove(pdf_output_path)
 
+    #     with open(args.failed_output_log, "a") as f:
+    #         f.write(arxiv_id + "\n")
+
+    print(f"Extracted abstract and PDF for {len(id_list) - num_fails}/{len(id_list)} articles.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

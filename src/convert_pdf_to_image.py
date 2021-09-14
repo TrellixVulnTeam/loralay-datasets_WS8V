@@ -29,6 +29,7 @@ def convert(args):
         # convert
         os.makedirs(output_folder)
         pages = convert_from_path(pdf_path, dpi=args.dpi)
+        pages = pages[args.first_page-1:]
         for i, p in enumerate(pages):
             p.save(os.path.join(output_folder, doc_id + "-" + str(i+1) + output_ext))
 
