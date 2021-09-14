@@ -104,18 +104,6 @@ def extract(args):
 
     print(f"Extracting {len(id_list)} articles from arXiv, using IDs in {args.input_file}")
 
-    # extracted_id_list = []
-
-    # for arxiv_id in tqdm(id_list):
-    #     pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
-    #     pdf_extracted = extract_pdf(arxiv_id, pdf_output_path)
-        
-    #     if pdf_extracted:
-    #         extracted_id_list.append(arxiv_id)
-    #     else:
-    #         with open(args.failed_output_log, "a") as f:
-    #             f.write(arxiv_id + "\n")
-
     remaining_ids = id_list.copy()
     num_fails = 0
 
@@ -128,19 +116,26 @@ def extract(args):
                 pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
                 pdf_extracted = extract_pdf(arxiv_id, pdf_output_path)
 
-                if pdf_extracted: # pdf extracted -> save abstract
+                if pdf_extracted: 
                     abstract_text = metadata["abstract"].replace("\n", " ")
-                    abstract_text = LatexNodes2Text().latex_to_text(abstract_text)
+                    try:
+                        abstract_text = LatexNodes2Text().latex_to_text(abstract_text)
+                        abstract_extracted = True
+                    except IndexError:
+                        abstract_extracted = False
+                        num_fails += 1
+
+                    
+                if pdf_extracted and abstract_extracted:
                     with open(args.abstract_output_path, 'a') as outfile:
                         json.dump(
                             {"id": arxiv_id, "abstract": abstract_text}, 
                             outfile
                         )
                         outfile.write('\n')
-
                     with open(args.downloaded_output_log, "a") as f:
                         f.write(arxiv_id + "\n")
-                else: 
+                else:
                     num_fails += 1
                     with open(args.failed_output_log, "a") as f:
                         f.write(arxiv_id + "\n")
@@ -154,13 +149,7 @@ def extract(args):
         num_fails += 1
         with open(args.failed_output_log, "a") as f:
             f.write(arxiv_id + "\n")
-    # for arxiv_id in extracted_id_list: # remove articles whose abstracts have not been extracted
-    #     pdf_output_path = os.path.join(args.pdf_output_dir, arxiv_id + ".pdf")
-    #     print(f"Abstract not found for article {arxiv_id}: deleting {pdf_output_path}")
-    #     os.remove(pdf_output_path)
 
-    #     with open(args.failed_output_log, "a") as f:
-    #         f.write(arxiv_id + "\n")
 
     print(f"Extracted abstract and PDF for {len(id_list) - num_fails}/{len(id_list)} articles.")
 
