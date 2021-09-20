@@ -1,9 +1,14 @@
 import argparse 
 import os 
-import shutil
+import time 
+from tqdm import tqdm
 import subprocess
 import urllib.request
 import json
+from src.utils import (
+    del_file_if_exists,
+    overwrite_dir_if_exists
+)
 
 def get_last_idx(downloaded_log, failed_log):
     """ Get last index processed
@@ -36,7 +41,7 @@ def extract_pdf(url, output_path):
     Returns:
         bool: True if extraction was successful, False otherwise
     """
-    command = f"wget -O {output_path} {url}"
+    command = f"wget -q -O {output_path} {url}"
     subprocess.call(command, shell=True)
     
     if os.path.exists(output_path):
@@ -45,61 +50,57 @@ def extract_pdf(url, output_path):
 
 def extract(args):
     if args.resume:
+        print("Resuming download...")
         start_idx = get_last_idx(args.downloaded_output_log, args.failed_output_log) + 1
-        stop_idx = args.n_docs - start_idx
     else:
         start_idx = 0
-        stop_idx = args.n_docs 
 
     url = "https://api.archives-ouvertes.fr/search/" \
         "?q=*:*&" \
         "wt=json&" \
         "indent=True&" \
-        f"fl=docid,files_s,{args.lang}_abstract_s&" \
-        f"fq=language_s:{args.lang}+submitType_s:file+docType_s:ART&" \
-        f"start={start_idx}&rows={stop_idx}"  
+        f"fl=docid,files_s,{args.lang}_abstract_s,docType_s&" \
+        f"fq=language_s:{args.lang}+submitType_s:file+docType_s:(ART%20OR%20COMM)&" \
+        f"start={start_idx}&rows={args.n_docs - start_idx}"  
     
-    print(url)
+    print(f"Extracting documents from url {url}")
 
     response = urllib.request.urlopen(url).read().decode()
     data = json.loads(response)
     start_idx = int(data["response"]["start"])
+    num_fails = 0
 
-    for i, item in enumerate(data["response"]["docs"]):
-        failed_extraction = False 
+    for i, item in enumerate(tqdm(data["response"]["docs"])):
+        successful_extraction = False 
         docid = str(item["docid"])
-        if args.lang + "_abstract_s" not in item:
-            failed_extraction = True 
-        else:
-            pdf_output_path = os.path.join(args.pdf_output_dir, docid + ".pdf")        
-            abstract_output_path = os.path.join(args.abstract_output_dir, docid + ".txt")
+        if args.lang + "_abstract_s" in item and "files_s" in item:
+            abstract_text = item[args.lang + "_abstract_s"][0].replace("\n", " ")  
+            if abstract_text is not None:    
+                pdf_output_path = os.path.join(args.pdf_output_dir, docid + ".pdf")        
 
-            pdf_url = item["files_s"][0]
-            abstract_text = item[args.lang + "_abstract_s"][0]  
+                pdf_url = item["files_s"][0]
+                pdf_extracted = extract_pdf(pdf_url, pdf_output_path)
 
-            pdf_extracted = extract_pdf(pdf_url, pdf_output_path)
-
-            if abstract_text:
                 if pdf_extracted:
-                    with open(abstract_output_path, "w") as fw:
-                        abstract_words = abstract_text.strip().split()
-                        for w in abstract_words:
-                            fw.write(w + "\n")
-                else:
-                    failed_extraction = True
-            else:
-                failed_extraction = True
-                if pdf_extracted: # pdf has been extracted, delete it
-                    os.remove(pdf_output_path)
+                    successful_extraction = True
 
-        if failed_extraction:
+        if not successful_extraction:
+            num_fails += 1
             with open(args.failed_output_log, "a") as f:
                 f.write(str(start_idx + i) + "\t" + docid + "\n")
         else:
+            with open(args.abstract_output_path, "a") as fw:
+                json.dump(
+                    {"id": docid, "abstract": abstract_text}, fw
+                )
+                fw.write('\n')
             with open(args.downloaded_output_log, "a") as f:
                 f.write(str(start_idx + i) + "\t" + docid + "\n")
+        
+        # time.sleep(1)
 
-                
+    num_total = len(data["response"]["docs"])
+    print(f"Extracted abstract and PDF for {num_total - num_fails}/{num_total} articles.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -115,7 +116,7 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "--abstract_output_dir", 
+        "--abstract_output_path", 
         type=str,
         required=True,
     )
@@ -152,30 +153,20 @@ if __name__ == "__main__":
             f"Cannot use --resume and --overwrite_output_dir at the same time."
         )
 
-    if os.listdir(args.pdf_output_dir) and not args.resume:
+    if (os.listdir(args.pdf_output_dir) or os.path.exists(args.abstract_output_path)) and not args.resume:
         if args.overwrite_output_dir:
-            for output_dir in [
-                args.pdf_output_dir, args.abstract_output_dir
-            ]:
-                if os.listdir(output_dir):
-                    print(f"Overwriting {output_dir}")
-                    shutil.rmtree(output_dir)
-                    os.makedirs(output_dir)
-
-            if os.path.isfile(args.downloaded_output_log):
-                print(f"Overwriting {args.downloaded_output_log}")
-                os.remove(args.downloaded_output_log)
-            if os.path.isfile(args.failed_output_log):
-                print(f"Overwriting {args.failed_output_log}")
-                os.remove(args.failed_output_log)
+            overwrite_dir_if_exists(args.pdf_output_dir)
+            del_file_if_exists(args.abstract_output_path)
+            del_file_if_exists(args.downloaded_output_log)
+            del_file_if_exists(args.failed_output_log)            
         else:
             if os.listdir(args.pdf_output_dir):
                 raise ValueError(
                     f"Output directory ({args.pdf_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
                 )
-            if os.listdir(args.abstract_output_dir):
+            if os.path.exists(args.abstract_output_path):
                 raise ValueError(
-                    f"Output directory ({args.abstract_output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
+                    f"Output file ({args.abstract_output_path}) already exists. Use --overwrite_output_dir to overcome."
                 )
 
 
