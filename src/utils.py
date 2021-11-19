@@ -83,7 +83,7 @@ def get_doc_content(doc_path):
     return doc_content
 
 def get_abstract(abstract_path, doc_id):
-    with open(abstract_path, "r") as f:
+    with open(abstract_path, "r", encoding="utf-8") as f:
         for line in f:
             item = json.loads(line)
             if item["id"] == doc_id:

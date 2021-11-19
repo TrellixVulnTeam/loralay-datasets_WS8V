@@ -9,20 +9,35 @@ from src.utils import remove_processed_from_id_list, compress_dir
 
 logger = logging.getLogger(__name__)
 
+REF_MAPPING = {
+    "it": "bibliografia",
+}
 
 def remove_special_chars(text):
     return re.sub('[^a-zA-Z0-9*\s]', '', text)
 
 def clean_text(text):
     text = re.sub(r"\s+", "", text)
+    text = re.sub(r"’", "'", text)
     return text
 
-def extract_text_from_tree(file_path):
+def normalize_bbox(bbox, size):
+    return (
+        int(1000 * bbox[0] / size[0]),
+        int(1000 * bbox[1] / size[1]),
+        int(1000 * bbox[2] / size[0]),
+        int(1000 * bbox[3] / size[1]),
+    )
+
+
+def extract_text_from_tree(file_path, lang, do_normalize_bbox=False):
     doc = []
 
     cur_page = []
     page_width = None
     page_height = None
+    ref_page_idx = None
+    ref_start_idx_in_page = None
 
     with open(file_path, 'rb') as f:
         for _, element in iterparse(f, events=("start", "end"), recover=True):
@@ -51,7 +66,15 @@ def extract_text_from_tree(file_path):
                             ymin, ymax = ymax, ymin
 
                         bbox = tuple([xmin, ymin, xmax, ymax])
+                        if do_normalize_bbox:
+                            bbox = normalize_bbox(bbox, (page_width, page_height))
+
+                        if word.lower() == REF_MAPPING[lang]:
+                            ref_page_idx = len(doc) 
+                            ref_start_idx_in_page = len(cur_page)
+
                         cur_page.append((word,) + bbox + (page_width, page_height))
+
             elif "page" in element.tag and element.attrib:
                 if len(cur_page) > 0:
                     doc.append(cur_page)
@@ -63,9 +86,17 @@ def extract_text_from_tree(file_path):
 
     if len(cur_page) > 0:
         doc.append(cur_page)
-        cur_page = []
 
-    return doc
+    if ref_page_idx is not None and ref_start_idx_in_page is not None:
+        # remove everything that follows references
+        doc = doc[: ref_page_idx+1] 
+        doc[ref_page_idx] = doc[ref_page_idx][: ref_start_idx_in_page] 
+
+    if any(doc): # no textual contents -> scanned document
+        return doc 
+
+    return None
+
 
 def parse(args):
     fnames = sorted(os.listdir(args.html_dir))
@@ -82,45 +113,48 @@ def parse(args):
 
     for html in tqdm(fnames):
         html_path = os.path.join(args.html_dir, html)
-        doc = extract_text_from_tree(html_path)
-
+        doc = extract_text_from_tree(html_path, args.lang, do_normalize_bbox=args.do_normalize_bbox)
         doc_id = html.replace(".html", "")
 
-        output_file = os.path.join(
-            os.path.join(args.output_dir, doc_id + ".txt")
-        )
-        with open(output_file, "w", encoding="utf-8") as fw:
-            for page_id, p in enumerate(doc):
-                for elem in p:
-                    word = elem[0]
-                    bbox = elem[1:5]
-                    page_width, page_height = elem[5:]
+        if doc is None:
+            with open(args.not_parsed_output_log, "a") as f:
+                f.write(doc_id + "\n")
+        else:
+            output_file = os.path.join(
+                os.path.join(args.output_dir, doc_id + ".txt")
+            )
+            with open(output_file, "w", encoding="utf-8") as fw:
+                for page_id, p in enumerate(doc):
+                    for elem in p:
+                        word = elem[0]
+                        bbox = elem[1:5]
+                        page_width, page_height = elem[5:]
 
-                    bbox_str = (
-                        str(bbox[0]) 
-                        + "\t" 
-                        + str(bbox[1]) 
-                        + "\t" 
-                        + str(bbox[2]) 
-                        + "\t" 
-                        + str(bbox[3])
-                    )
+                        bbox_str = (
+                            str(bbox[0]) 
+                            + "\t" 
+                            + str(bbox[1]) 
+                            + "\t" 
+                            + str(bbox[2]) 
+                            + "\t" 
+                            + str(bbox[3])
+                        )
 
-                    fw.write(
-                        word 
-                        + "\t" 
-                        + bbox_str 
-                        + "\t" 
-                        + str(page_width) 
-                        + "\t" 
-                        + str(page_height) 
-                        + "\t"
-                        + str(page_id+1)
-                        + "\n" 
-                    )
+                        fw.write(
+                            word 
+                            + "\t" 
+                            + bbox_str 
+                            + "\t" 
+                            + str(page_width) 
+                            + "\t" 
+                            + str(page_height) 
+                            + "\t"
+                            + str(page_id+1)
+                            + "\n" 
+                        )
 
-        with open(args.parsed_output_log, "a") as f:
-            f.write(doc_id + "\n")
+            with open(args.parsed_output_log, "a") as f:
+                f.write(doc_id + "\n")
                     
 
 if __name__ == "__main__":
@@ -137,14 +171,29 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
+        "--lang",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
         "--n_docs", 
         type=int,
         default=5,
     )
     parser.add_argument(
+        "--do_normalize_bbox", 
+        action="store_true", 
+        help="Normalize bbox coordinates."
+    )
+    parser.add_argument(
         "--parsed_output_log",
         type=str,
         default="./parsed.log"
+    )
+    parser.add_argument(
+        "--not_parsed_output_log",
+        type=str,
+        default="./not_parsed_output_log.log"
     )
     parser.add_argument(
         "--resume", 
@@ -172,6 +221,9 @@ if __name__ == "__main__":
 
             print(f"Overwriting {args.parsed_output_log}")
             os.remove(args.parsed_output_log)
+
+            print(f"Overwriting {args.not_parsed_output_log}")
+            os.remove(args.not_parsed_output_log)
         else:
             raise ValueError(
                 f"Output directory ({args.output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."

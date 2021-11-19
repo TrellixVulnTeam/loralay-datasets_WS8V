@@ -7,6 +7,7 @@ from tqdm import tqdm
 import regex as re
 from fuzzysearch import find_near_matches 
 from PIL import Image, ImageDraw
+import subprocess
 from src.utils import (
     remove_processed_from_id_list, 
     compress_dir, 
@@ -59,48 +60,6 @@ def find_abstract_span(text, abstract_text, max_l_dist=15):
     return None 
 
 
-def _update_text(page_path, doc_lines, abstract_span):
-    with open(page_path, "w", encoding="utf-8") as f:
-        for i, line in enumerate(doc_lines):
-            if i < abstract_span[0] or i > abstract_span[1]:
-                f.write(line)
-
-def _update_image(image_path, doc_lines, abstract_span):
-    image = Image.open(image_path)
-    draw = ImageDraw.Draw(image)
-    img_width, img_height = image.size
-    width, height = doc_lines[0].split("\t")[5:7]
-    width, height = int(width), int(height)
-    scale_w = img_width / width
-    scale_h = img_height / height
-
-    for i, line in enumerate(doc_lines):
-        if i >= abstract_span[0] and i <= abstract_span[1]:
-            line = line.split("\t")
-            box = line[1:5]
-            box = [int(b) for b in box]
-            scaled_box = [box[0] * scale_w, box[1] * scale_h, box[2] * scale_w, box[3] * scale_h]
-
-            draw.rectangle(scaled_box, fill="black")
-
-    image.save(image_path)
-    image.close()
-
-# def update_page(
-#     page_path, 
-#     image_path, 
-#     doc_lines, 
-#     abstract_span,
-# ):
-#     _update_text(page_path, doc_lines, abstract_span)
-#     _update_image(image_path, doc_lines, abstract_span)
-    
-# def extract_from_txt(page_path):
-#     with open(page_path, "r", encoding="utf-8") as f:
-#         page_content = f.read().splitlines()
-
-#     return page_content
-
 def _update_and_save_txt(out_txt_path, in_txt_path, start_stop_indices):
     with open(out_txt_path, "w") as fw:
         with open(in_txt_path, "r") as f:
@@ -147,6 +106,11 @@ def _update_and_save_img(
     compress_dir(out_img_tar, doc_out_img_folder)
     shutil.rmtree(doc_out_img_folder)
 
+def count_num_pages(filepath):
+    last_line = subprocess.check_output(['tail', '-1', filepath])[:-1]
+    last_line = last_line.decode("utf-8").split("\t")
+    return int(last_line[-1])
+
 
 def find_and_remove(args):
     txt_fnames = sorted(os.listdir(args.text_dir))
@@ -168,35 +132,40 @@ def find_and_remove(args):
         abstract_text = get_abstract(args.abstract_path, doc_id) 
 
         doc_txt_path = os.path.join(args.text_dir, txt_fname)
-        img_tar = os.path.join(args.img_dir, doc_id + ".tar.gz")
-
         doc_out_txt_path = os.path.join(args.output_text_dir, txt_fname)
-        # doc_out_img_folder = os.path.join(args.output_img_dir, doc_id) # output folder where images are extracted
-        doc_out_img_tar = os.path.join(args.output_img_dir, doc_id + ".tar.gz")
 
-        with open(doc_txt_path) as f:
+        if args.img_dir is not None:
+            img_tar = os.path.join(args.img_dir, doc_id + ".tar.gz")
+            doc_out_img_tar = os.path.join(args.output_img_dir, doc_id + ".tar.gz")
+
+        with open(doc_txt_path, 'r') as f:
             curr_page = []
             curr_page_num = 1
 
             abstract_found = False
             offset = 0
 
+            num_pages = count_num_pages(doc_txt_path)
+            pages_to_search = [1, 2, num_pages-1, num_pages] # we only look at the first two and last two pages
+
             for i, line in enumerate(f):
                 splits = line.split("\t")
-                text = splits[0]
-                page_num = splits[-1].rstrip()
+                page_num = int(splits[-1].rstrip())
 
-                if page_num != curr_page_num:
-                    curr_text = " ".join([content[0] for content in curr_page])
-                    abstract_start_top_indices = find_abstract_span(
-                        curr_text, abstract_text, args.max_l_dist
-                    )
-                    if abstract_start_top_indices is not None:
-                        abstract_found = True 
-                        abstract_start_top_indices = (
-                            abstract_start_top_indices[0] + offset,
-                            abstract_start_top_indices[1] + offset,
+                if page_num != curr_page_num: # new page
+                    if curr_page_num in pages_to_search: 
+                        curr_text = " ".join([content[0] for content in curr_page])
+                        abstract_start_stop_indices = find_abstract_span(
+                            curr_text.lower(), abstract_text.lower(), args.max_l_dist
                         )
+                        if abstract_start_stop_indices is not None:
+                            abstract_found = True 
+                            abstract_start_stop_indices = (
+                                abstract_start_stop_indices[0] + offset,
+                                abstract_start_stop_indices[1] + offset,
+                            )
+                             
+                    if abstract_found:
                         break 
                     else:
                         curr_page = [splits]
@@ -205,23 +174,37 @@ def find_and_remove(args):
                 else:
                     curr_page.append(splits)
 
+
+            if not abstract_found: # abstract might be in the last page
+                curr_text = " ".join([content[0] for content in curr_page])
+                abstract_start_stop_indices = find_abstract_span(
+                    curr_text, abstract_text, args.max_l_dist
+                )
+                if abstract_start_stop_indices is not None:
+                    abstract_found = True 
+                    abstract_start_stop_indices = (
+                        abstract_start_stop_indices[0] + offset,
+                        abstract_start_stop_indices[1] + offset,
+                    )
+
         if abstract_found:
             bboxes = [line[1:5] for line in curr_page]
             pdf_size = (int(curr_page[0][5]), int(curr_page[0][6]))
 
             _update_and_save_txt(
-                doc_out_txt_path, doc_txt_path, abstract_start_top_indices
+                doc_out_txt_path, doc_txt_path, abstract_start_stop_indices
             )
-            _update_and_save_img(
-                doc_id, 
-                img_tar, 
-                curr_page_num, 
-                abstract_start_top_indices, 
-                pdf_size,
-                bboxes,
-                args.output_img_dir,
-                doc_out_img_tar 
-            )
+            if args.img_dir is not None:
+                _update_and_save_img(
+                    doc_id, 
+                    img_tar, 
+                    curr_page_num, 
+                    abstract_start_stop_indices, 
+                    pdf_size,
+                    bboxes,
+                    args.output_img_dir,
+                    doc_out_img_tar 
+                )
 
             with open(args.found_output_log, "a") as f:
                 f.write(doc_id + "\n")
@@ -250,7 +233,6 @@ if __name__ == "__main__":
         "--img_dir",
         default=None,
         type=str,
-        required=True,
     )
     parser.add_argument(
         "--output_text_dir",
@@ -262,7 +244,6 @@ if __name__ == "__main__":
         "--output_img_dir",
         default=None,
         type=str,
-        required=True,
     )
     parser.add_argument(
         "--n_docs", 
@@ -307,7 +288,8 @@ if __name__ == "__main__":
     ):
         if args.overwrite_output_dir:
             overwrite_dir_if_exists(args.output_text_dir)
-            overwrite_dir_if_exists(args.output_img_dir)
+            if args.img_dir is not None: 
+                overwrite_dir_if_exists(args.output_img_dir)
             del_file_if_exists(args.found_output_log)
             del_file_if_exists(args.failed_output_log)
         else:
@@ -315,7 +297,7 @@ if __name__ == "__main__":
                 raise ValueError(
                     f"Output directory ({args.output_text_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
                 )
-            if os.listdir(args.output_img_dir):
+            if args.img_dir is not None and os.listdir(args.output_img_dir):
                 raise ValueError(
                     f"Output directory ({args.output_img_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
                 )
