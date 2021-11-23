@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 REF_MAPPING = {
     "de": ["bibliografie","literatur", "referenzen"],
     "es": ["referencias", "bibliografía"],
+    "fr": ["bibliographie", "références"],
     "it": ["bibliografia"],
     "pt": ["referências", "bibliografia"],
     "ru": ["литература"],
@@ -42,7 +43,7 @@ def skip_first_page(page):
 
     return False
 
-def extract_text_from_tree(file_path, lang, do_normalize_bbox=False):
+def extract_text_from_tree(file_path, lang, do_normalize_bbox=False, remove_ref=False):
     doc = []
 
     cur_page = []
@@ -81,7 +82,7 @@ def extract_text_from_tree(file_path, lang, do_normalize_bbox=False):
                         if do_normalize_bbox:
                             bbox = normalize_bbox(bbox, (page_width, page_height))
 
-                        if word.lower() in REF_MAPPING[lang]:
+                        if remove_ref and word.lower() in REF_MAPPING[lang]:
                             ref_page_idx = len(doc) 
                             ref_start_idx_in_page = len(cur_page)
 
@@ -101,10 +102,10 @@ def extract_text_from_tree(file_path, lang, do_normalize_bbox=False):
  
     if len(doc) > 0 and skip_first_page(doc[0]):
         doc = doc[1:]
-        if ref_page_idx is not None:
+        if remove_ref and ref_page_idx is not None:
             ref_page_idx -= 1
 
-    if ref_page_idx is not None and ref_start_idx_in_page is not None:
+    if remove_ref and ref_page_idx is not None and ref_start_idx_in_page is not None:
         # remove everything that follows references
         doc = doc[: ref_page_idx+1] 
         doc[ref_page_idx] = doc[ref_page_idx][: ref_start_idx_in_page] 
@@ -130,7 +131,9 @@ def parse(args):
 
     for html in tqdm(fnames):
         html_path = os.path.join(args.html_dir, html)
-        doc = extract_text_from_tree(html_path, args.lang, do_normalize_bbox=args.do_normalize_bbox)
+        doc = extract_text_from_tree(
+            html_path, args.lang, do_normalize_bbox=args.do_normalize_bbox, remove_ref=args.remove_ref
+        )
         doc_id = html.replace(".html", "")
 
         if doc is None:
@@ -190,7 +193,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lang",
         type=str,
-        required=True,
+    )
+    parser.add_argument(
+        "--remove_ref",
+        action="store_true", 
     )
     parser.add_argument(
         "--n_docs", 
