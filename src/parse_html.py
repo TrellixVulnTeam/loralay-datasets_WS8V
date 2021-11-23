@@ -10,7 +10,11 @@ from src.utils import remove_processed_from_id_list, compress_dir
 logger = logging.getLogger(__name__)
 
 REF_MAPPING = {
-    "it": "bibliografia",
+    "de": ["bibliografie","literatur", "referenzen"],
+    "es": ["referencias", "bibliografía"],
+    "it": ["bibliografia"],
+    "pt": ["referências", "bibliografia"],
+    "ru": ["литература"],
 }
 
 def remove_special_chars(text):
@@ -29,6 +33,14 @@ def normalize_bbox(bbox, size):
         int(1000 * bbox[3] / size[1]),
     )
 
+def skip_first_page(page):
+    text = [elem[0] for elem in page]
+    text = " ".join(text)
+
+    if "HAL is a multi-disciplinary open access archive" in text:
+        return True 
+
+    return False
 
 def extract_text_from_tree(file_path, lang, do_normalize_bbox=False):
     doc = []
@@ -69,7 +81,7 @@ def extract_text_from_tree(file_path, lang, do_normalize_bbox=False):
                         if do_normalize_bbox:
                             bbox = normalize_bbox(bbox, (page_width, page_height))
 
-                        if word.lower() == REF_MAPPING[lang]:
+                        if word.lower() in REF_MAPPING[lang]:
                             ref_page_idx = len(doc) 
                             ref_start_idx_in_page = len(cur_page)
 
@@ -86,6 +98,11 @@ def extract_text_from_tree(file_path, lang, do_normalize_bbox=False):
 
     if len(cur_page) > 0:
         doc.append(cur_page)
+ 
+    if len(doc) > 0 and skip_first_page(doc[0]):
+        doc = doc[1:]
+        if ref_page_idx is not None:
+            ref_page_idx -= 1
 
     if ref_page_idx is not None and ref_start_idx_in_page is not None:
         # remove everything that follows references

@@ -28,6 +28,9 @@ def find_word_idx_for_span(text, start_idx, end_idx):
         i for i, w in enumerate(new_splitted_text) if w == "<IS_ABSTRACT>"
     ]
 
+    if len(abstract_idx) == 0:
+        return None 
+
     return (abstract_idx[0], abstract_idx[-1])
 
 def find_abstract_span(text, abstract_text, max_l_dist=15):
@@ -130,6 +133,12 @@ def find_and_remove(args):
     for txt_fname in tqdm(txt_fnames):
         doc_id = txt_fname.replace(".txt", "")
         abstract_text = get_abstract(args.abstract_path, doc_id) 
+
+        if args.abstract_thresh > 0 and len(abstract_text.split()) < args.abstract_thresh:
+            print("Skipped {} (# words in abstract = {} < {})".format(
+                txt_fname, len(abstract_text.split()), args.abstract_thresh
+            ))
+            continue 
 
         doc_txt_path = os.path.join(args.text_dir, txt_fname)
         doc_out_txt_path = os.path.join(args.output_text_dir, txt_fname)
@@ -249,6 +258,11 @@ if __name__ == "__main__":
         "--n_docs", 
         type=int,
         default=5,
+    )
+    parser.add_argument(
+        "--abstract_thresh", 
+        type=int,
+        default=-1,
     )
     parser.add_argument(
         "--max_l_dist", 
