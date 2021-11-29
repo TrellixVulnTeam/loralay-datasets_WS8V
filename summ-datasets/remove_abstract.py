@@ -3,11 +3,14 @@ import os
 import shutil
 import natsort
 import tarfile
+import time
 from tqdm import tqdm 
 import regex as re
 from fuzzysearch import find_near_matches 
 from PIL import Image, ImageDraw
 import subprocess
+import urllib.request
+import json
 from src.utils import (
     remove_processed_from_id_list, 
     compress_dir, 
@@ -30,6 +33,9 @@ def find_word_idx_for_span(text, start_idx, end_idx):
 
     if len(abstract_idx) == 0:
         return None 
+
+    if len(abstract_idx) == len(text.split()):
+        return None
 
     return (abstract_idx[0], abstract_idx[-1])
 
@@ -115,21 +121,7 @@ def count_num_pages(filepath):
     return int(last_line[-1])
 
 
-def find_and_remove(args):
-    txt_fnames = sorted(os.listdir(args.text_dir))
-    txt_fnames = txt_fnames[:args.n_docs] if args.n_docs > 0 else txt_fnames 
-
-    if args.resume_processing:
-        txt_fnames = [fname[:-len(".txt")] for fname in txt_fnames]
-        print("Resuming processing...")
-        txt_fnames = remove_processed_from_id_list(
-            txt_fnames, args.found_output_log, args.failed_output_log
-        )
-        if not txt_fnames:
-            print(f"All documents in {args.text_dir} have already been processed.")
-            return 
-        txt_fnames = [fname + ".txt" for fname in txt_fnames]
-
+def _find_and_remove_main(txt_fnames, args):
     for txt_fname in tqdm(txt_fnames):
         doc_id = txt_fname.replace(".txt", "")
         abstract_text = get_abstract(args.abstract_path, doc_id) 
@@ -187,7 +179,7 @@ def find_and_remove(args):
             if not abstract_found: # abstract might be in the last page
                 curr_text = " ".join([content[0] for content in curr_page])
                 abstract_start_stop_indices = find_abstract_span(
-                    curr_text, abstract_text, args.max_l_dist
+                    curr_text.lower(), abstract_text.lower(), args.max_l_dist
                 )
                 if abstract_start_stop_indices is not None:
                     abstract_found = True 
@@ -222,6 +214,138 @@ def find_and_remove(args):
                 f.write(doc_id + "\n")
 
 
+def _find_and_remove_other(txt_fnames, args):
+    for txt_fname in tqdm(txt_fnames):
+        doc_id = txt_fname.replace(".txt", "")
+        url = "https://api.archives-ouvertes.fr/search/" \
+            f"?q=docid:{doc_id}&" \
+            "wt=json&" \
+            "indent=True&" \
+            f"fl=abstract_s,{args.main_lang}_abstract_s" 
+        response = urllib.request.urlopen(url).read().decode()
+        data = json.loads(response)
+        all_abstracts = data["response"]["docs"][0]["abstract_s"]
+        main_abstract = data["response"]["docs"][0][args.main_lang + "_abstract_s"][0]
+
+        doc_txt_path = os.path.join(args.text_dir, txt_fname)
+        doc_out_txt_path = os.path.join(args.output_text_dir, txt_fname)
+        if args.img_dir is not None:
+            img_tar = os.path.join(args.img_dir, doc_id + ".tar.gz")
+            doc_out_img_tar = os.path.join(args.output_img_dir, doc_id + ".tar.gz")
+
+        if len(all_abstracts) == 1:
+            shutil.copyfile(doc_txt_path, doc_out_txt_path)
+            continue 
+
+        all_abstracts = [abstract for abstract in all_abstracts if abstract != main_abstract]
+        all_abstracts = [abstract_text.replace("\n", "") for abstract_text in all_abstracts]
+
+        all_abstracts_start_stop_indices = [None for _ in all_abstracts]
+        all_abstracts_found = [False for _ in all_abstracts]
+        all_abstracts_page = [None for _ in all_abstracts]
+
+        with open(doc_txt_path, 'r') as f:
+            curr_page = []
+            curr_page_num = 1
+
+            offset = 0
+
+            num_pages = count_num_pages(doc_txt_path)
+            pages_to_search = [1, 2, num_pages-1, num_pages] # we only look at the first two and last two pages
+
+            for i, line in enumerate(f):
+                splits = line.split("\t")
+                page_num = int(splits[-1].rstrip())
+
+                if page_num != curr_page_num: # new page
+                    if curr_page_num in pages_to_search: 
+                        curr_text = " ".join([content[0] for content in curr_page])
+                        for lang_idx, abstract_text in enumerate(all_abstracts):
+                            abstract_start_stop_indices = find_abstract_span(
+                                curr_text.lower(), abstract_text.lower(), args.max_l_dist
+                            )
+                            if abstract_start_stop_indices is not None:
+                                all_abstracts_found[lang_idx] = True 
+                                all_abstracts_start_stop_indices[lang_idx] = (
+                                    abstract_start_stop_indices[0] + offset,
+                                    abstract_start_stop_indices[1] + offset,
+                                )
+                                all_abstracts_page[lang_idx] = (curr_page_num, curr_page)
+                            
+                    if all(all_abstracts_found):
+                        break 
+                    else:
+                        curr_page = [splits]
+                        offset = i
+                        curr_page_num = page_num
+                else:
+                    curr_page.append(splits)
+
+
+            if not all(all_abstracts_found): # abstract might be in the last page
+                curr_text = " ".join([content[0] for content in curr_page])
+                for lang_idx, abstract_text in enumerate(all_abstracts):
+                    abstract_start_stop_indices = find_abstract_span(
+                        curr_text.lower(), abstract_text.lower(), args.max_l_dist
+                    )
+                    if abstract_start_stop_indices is not None:
+                        all_abstracts_found[lang_idx] = True
+                        all_abstracts_start_stop_indices[lang_idx] = (
+                            abstract_start_stop_indices[0] + offset,
+                            abstract_start_stop_indices[1] + offset,
+                        )
+                        all_abstracts_page[lang_idx] = (curr_page_num, curr_page)
+
+        if all(all_abstracts_found):
+            for lang_idx in range(len(all_abstracts)):
+                page_num, page = all_abstracts_page[lang_idx]
+                abstract_start_stop_indices = all_abstracts_start_stop_indices[lang_idx]
+                bboxes = [line[1:5] for line in page]
+                pdf_size = (int(page[0][5]), int(page[0][6]))
+
+                _update_and_save_txt(
+                    doc_out_txt_path, doc_txt_path, abstract_start_stop_indices
+                )
+                if args.img_dir is not None:
+                    _update_and_save_img(
+                        doc_id, 
+                        img_tar, 
+                        page_num, 
+                        abstract_start_stop_indices, 
+                        pdf_size,
+                        bboxes,
+                        args.output_img_dir,
+                        doc_out_img_tar 
+                    )
+
+            with open(args.found_output_log, "a") as f:
+                f.write(doc_id + "\n")
+        else:
+            with open(args.failed_output_log, "a") as f:
+                f.write(doc_id + "\n")
+
+        # time.sleep(1)
+
+def find_and_remove(args):
+    txt_fnames = sorted(os.listdir(args.text_dir))
+    txt_fnames = txt_fnames[:args.n_docs] if args.n_docs > 0 else txt_fnames 
+
+    if args.resume_processing:
+        txt_fnames = [fname[:-len(".txt")] for fname in txt_fnames]
+        print("Resuming processing...")
+        txt_fnames = remove_processed_from_id_list(
+            txt_fnames, args.found_output_log, args.failed_output_log
+        )
+        if not txt_fnames:
+            print(f"All documents in {args.text_dir} have already been processed.")
+            return 
+        txt_fnames = [fname + ".txt" for fname in txt_fnames]
+
+    if not args.remove_other_lang:
+        _find_and_remove_main(txt_fnames, args)
+    else:
+        _find_and_remove_other(txt_fnames, args)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -236,7 +360,6 @@ if __name__ == "__main__":
         "--abstract_path",
         default=None,
         type=str,
-        required=True,
     )
     parser.add_argument(
         "--img_dir",
@@ -253,6 +376,16 @@ if __name__ == "__main__":
         "--output_img_dir",
         default=None,
         type=str,
+    )
+    parser.add_argument(
+        "--main_lang",
+        default=None,
+        type=str,
+    )
+    parser.add_argument(
+        "--remove_other_lang", 
+        action="store_true", 
+        help="Remove abstracts in other languages."
     )
     parser.add_argument(
         "--n_docs", 
