@@ -9,7 +9,7 @@ from src.utils import del_file_if_exists
 class ScieloSpider(scrapy.Spider):
     name = "scielo_spider"
     custom_settings = {
-        'DOWNLOAD_DELAY': 3,
+        'DOWNLOAD_DELAY': 3, # amount of time (in secs) waiting before downloading consecutive pages
         'FEED_EXPORT_ENCODING': 'utf-8'
     }
 
@@ -27,6 +27,8 @@ class ScieloSpider(scrapy.Spider):
         current_page = int(response.xpath(CURRENT_PAGE_SELECTOR).extract_first())
         stop_page = self.stop_page if self.stop_page > 0 else total_num_pages
 
+        print("Page {}/{} (stopping at {})".format(current_page, total_num_pages, stop_page))
+
         for publication in response.css(ITEM_SELECTOR):            
             DOI_SELECTOR = './/span[@class="DOIResults"]/a/text()'
             ABSTRACT_SELECTOR = './/div[@class="abstract"]'
@@ -34,13 +36,13 @@ class ScieloSpider(scrapy.Spider):
             DATE_SELECTOR = './/div[@class="line source"]/span[@style="margin: 0"]'
 
             doi_link = publication.xpath(DOI_SELECTOR).extract_first()
-            if doi_link is None:
+            if doi_link is None: 
                 continue 
             doi = doi_link.replace("https://doi.org/", "").replace("/", "_")
             item = {"doi": doi}
 
             date = publication.xpath(DATE_SELECTOR)
-            if len(date) != 2:
+            if len(date) != 2: # date should be month, year
                 item["date"] = "unknown"
             else:
                 month = date[0].xpath("text()").extract_first().strip()
@@ -51,13 +53,14 @@ class ScieloSpider(scrapy.Spider):
             if len(all_abstracts) == 0:
                 continue
             for abstract in all_abstracts:
-                abstract_id = abstract.xpath('@id').extract_first()
+                abstract_id = abstract.xpath('@id').extract_first() # last two chars of @id indicate the language
                 abstract_text = abstract.xpath('text()').extract_first()
                 if abstract_text is not None:
                     abstract_text = abstract_text.strip()
                     if len(abstract_text) > 0:
                         item["abstract_" + abstract_id[-2:]] = abstract_text
 
+            # If publication has no spanish or portuguese abstract, skip
             if not ("abstract_es" in item.keys() or "abstract_pt" in item.keys()):
                 continue 
             
@@ -70,37 +73,40 @@ class ScieloSpider(scrapy.Spider):
                 meta={'item': item}
             )
 
-        if current_page < stop_page:
+        if current_page < stop_page: # there are still pages to crawl
             next_page = current_page + 1
-            num_publications = int(re.search(".+&count=(\d+)&.+", response.url).group(1))
+            num_publications = int(re.search(".+&count=(\d+)&.+", response.url).group(1)) # num of publications to return
             next_url = response.url.replace(
                 re.search(".+&(from=\d+)&.+", response.url).group(1),
                 f"from={num_publications * current_page + 1}"
-            )
-            next_url = next_url.replace(f"page={current_page}", f"page={next_page}")
+            ) # increment index of starting publication
+            next_url = next_url.replace(f"page={current_page}", f"page={next_page}") # increment page number
             yield scrapy.Request(
-                response.urljoin(
-                    # f"https://search.scielo.org/?q=*&lang=en&count=50&from={50 * current_page + 1}&output=site&sort=&format=summary&fb=&page={next_page}"
-                    next_url
-                ),
+                response.urljoin(next_url),
                 callback=self.parse
             )
 
     
     def parse_page(self, response):
         item = response.meta['item']
+        # The page can be in English, Portuguese or Spanish
+        # We look for the HTML element that contains the link to the PDF 
+        # It is indicated by either 'Download PDF (<lang>)' or '<lang> (pdf)'
         languages = ["Portuguese", "Português", "Portugués", "Spanish", "Espanhol", "Español"]
         pdf_url = None
 
         for lang in languages:
+            # Brasilian and Public Health Scielo have a different interface from the rest
             if "www.scielo.br" in response.url or "www.scielosp.org" in response.url:
                 PDF_URL_SELECTOR = f".//a[contains(text(), 'Download PDF ({lang})')]/@href"
             else:
                 PDF_URL_SELECTOR = f".//a[contains(text(), '{lang} (pdf)')]/@href"
             pdf_url = response.xpath(PDF_URL_SELECTOR).extract_first() 
+            # There is generally only one PDF, grab the first one 
             if pdf_url is not None:
                 break 
 
+        # We look for the webpage's URL domain and prepend it to the PDF link
         m = re.search('(https?://[A-Za-z_0-9.-]+).*', response.url)
         if m:
             url_domain = m.group(1)
@@ -149,7 +155,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if os.path.exists(args.output_file) and args.overwrite_output:
-        del_file_if_exists(args.output_file)
+    if os.path.exists(args.output_file):
+        if args.overwrite_output:
+            del_file_if_exists(args.output_file)
+        else:
+            raise ValueError(
+                f"Output file ({args.output_file}) already exists and is not empty. Use --overwrite_output to overcome."
+            )
 
     crawl_scielo(args)

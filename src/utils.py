@@ -2,6 +2,7 @@ import json
 import os 
 import tarfile
 import shutil
+import subprocess
 
 def del_file_if_exists(path_to_file):
     if os.path.isfile(path_to_file):
@@ -28,6 +29,22 @@ def get_ids_from_arxiv_or_pubmed(input_file, limit):
     
     return id_list
 
+def extract_pdf(url, output_path):
+    """ Extract PDF based on URL
+
+    Args:
+        url (string): link to PDF 
+        output_path (string): Path to output PDF file
+
+    Returns:
+        bool: True if extraction was successful, False otherwise
+    """
+    command = f"wget -w 3 --random-wait -q -O {output_path} {url}"
+    subprocess.call(command, shell=True)
+    
+    if os.path.exists(output_path):
+        return True
+    return False 
 
 def remove_processed_from_id_list(id_list, processed_log, failed_log=None):
     """ Remove already processed documents and documents that could not be processed

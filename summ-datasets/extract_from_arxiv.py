@@ -12,7 +12,6 @@ from src.utils import (
     del_file_if_exists,
     get_ids_from_arxiv_or_pubmed, 
     remove_processed_from_id_list,
-    del_file_if_exists,
     overwrite_dir_if_exists
 )
 

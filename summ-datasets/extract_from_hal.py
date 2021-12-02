@@ -7,7 +7,8 @@ import urllib.request
 import json
 from src.utils import (
     del_file_if_exists,
-    overwrite_dir_if_exists
+    overwrite_dir_if_exists,
+    extract_pdf
 )
 
 def get_last_idx(downloaded_log, failed_log):
@@ -30,23 +31,6 @@ def get_last_idx(downloaded_log, failed_log):
         last_failed_idx = lines[-1].split("\t")[0]
 
     return max(int(last_downloaded_idx), int(last_failed_idx))
-
-def extract_pdf(url, output_path):
-    """ Extract PDF based on URL
-
-    Args:
-        url (string): link to PDF 
-        output_path (string): Path to output PDF file
-
-    Returns:
-        bool: True if extraction was successful, False otherwise
-    """
-    command = f"wget -q -O {output_path} {url}"
-    subprocess.call(command, shell=True)
-    
-    if os.path.exists(output_path):
-        return True
-    return False 
 
 def extract(args):
     if args.resume:

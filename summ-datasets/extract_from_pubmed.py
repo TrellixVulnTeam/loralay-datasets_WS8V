@@ -13,7 +13,8 @@ from src.utils import (
     get_ids_from_arxiv_or_pubmed, 
     remove_processed_from_id_list,
     del_file_if_exists,
-    overwrite_dir_if_exists
+    overwrite_dir_if_exists,
+    extract_pdf
 )
 import zlib
 
@@ -36,23 +37,6 @@ def extract_abstract(url):
     else:
         abstract_text = " ".join(a.text for a in abstract_nodes)
         return abstract_text
-
-def extract_pdf_from_pdf_url(url, output_path):
-    """ Extract PDF based on FTP link (https://www.ncbi.nlm.nih.gov/pmc/tools/ftp/)
-
-    Args:
-        url (string): FTP link to PDF 
-        output_path (string): Path to output PDF file
-
-    Returns:
-        bool: True if extraction was successful, False otherwise
-    """
-    command = f"wget -q -O {output_path} {url}"
-    subprocess.call(command, shell=True)
-    
-    if os.path.exists(output_path):
-        return True
-    return False 
 
 def extract_pdf_from_tar_url(url, output_path, tar_path):
     """ Extract PDF from tar archive 
@@ -129,7 +113,7 @@ def extract(args):
         if not ftp_url:
             pdf_extracted = False
         elif ".pdf" in ftp_url:
-            pdf_extracted = extract_pdf_from_pdf_url(ftp_url, output_path)
+            pdf_extracted = extract_pdf(ftp_url, output_path) 
         else:
             tar_path = os.path.join(args.extract_output_dir, pmcid + ".tar.gz")
 
