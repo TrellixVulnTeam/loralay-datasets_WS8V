@@ -12,6 +12,19 @@ class ScieloSpider(scrapy.Spider):
         'DOWNLOAD_DELAY': 3, # amount of time (in secs) waiting before downloading consecutive pages
         'FEED_EXPORT_ENCODING': 'utf-8',
         'LOG_LEVEL': 'INFO',
+        'USER_AGENTS': [
+            ('Mozilla/5.0 (X11; Linux x86_64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/57.0.2987.110 '
+            'Safari/537.36'),  # chrome
+            ('Mozilla/5.0 (X11; Linux x86_64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/61.0.3163.79 '
+            'Safari/537.36'),  # chrome
+            ('Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:55.0) '
+            'Gecko/20100101 '
+            'Firefox/55.0')  # firefox
+        ]
     }
 
 
@@ -30,17 +43,24 @@ class ScieloSpider(scrapy.Spider):
 
         print("Page {}/{} (stopping at {})".format(current_page, total_num_pages, stop_page))
 
-        for publication in response.css(ITEM_SELECTOR):            
+        for publication in response.css(ITEM_SELECTOR):     
+            ITEM_NUM_SELECTOR = './/div[@class="line"]/text()'
             DOI_SELECTOR = './/span[@class="DOIResults"]/a/text()'
             ABSTRACT_SELECTOR = './/div[@class="abstract"]'
             TEXT_URL_SELECTOR = './/a[@class="showTooltip"]/@href'
             DATE_SELECTOR = './/div[@class="line source"]/span[@style="margin: 0"]'
 
+            item_number = publication.xpath(ITEM_NUM_SELECTOR).extract_first().strip()[:-1]
             doi_link = publication.xpath(DOI_SELECTOR).extract_first()
-            if doi_link is None: 
-                continue 
-            doi = doi_link.replace("https://doi.org/", "").replace("/", "_")
-            item = {"doi": doi}
+            if doi_link is not None: 
+                doi = doi_link.replace("https://doi.org/", "")
+            else:
+                doi = None
+                
+            item = {
+                "id": args.collection_prefix + "_" + item_number,
+                "doi": doi
+            }
 
             date = publication.xpath(DATE_SELECTOR)
             if len(date) != 2: # date should be month, year
@@ -99,7 +119,9 @@ class ScieloSpider(scrapy.Spider):
         # It is indicated by either 'Download PDF (<lang>)' or '<lang> (pdf)'
         languages = ["Portuguese", "Português", "Portugués", "Spanish", "Espanhol", "Español"]
         pdf_url = None
+        item["pdf_lang"] = None
 
+        # Try each language
         for lang in languages:
             # Brasilian and Public Health Scielo have a different interface from the rest
             if "www.scielo.br" in response.url or "www.scielosp.org" in response.url:
@@ -107,8 +129,9 @@ class ScieloSpider(scrapy.Spider):
             else:
                 PDF_URL_SELECTOR = f".//a[contains(text(), '{lang} (pdf)')]/@href"
             pdf_url = response.xpath(PDF_URL_SELECTOR).extract_first() 
-            # There is generally only one PDF, grab the first one 
+            # There is generally only one PDF
             if pdf_url is not None:
+                item["pdf_lang"] = "pt" if lang in ["Portuguese", "Português", "Portugués"] else "es"
                 break 
 
         # We look for the webpage's URL domain and prepend it to the PDF link
@@ -141,6 +164,11 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--start_url",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "--collection_prefix",
         type=str,
         required=True,
     )
