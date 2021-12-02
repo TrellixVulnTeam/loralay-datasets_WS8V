@@ -112,6 +112,8 @@ class ScieloSpider(scrapy.Spider):
             url_domain = m.group(1)
             if pdf_url is not None:
                 item['pdf_url'] = url_domain + pdf_url
+            else:
+                item['pdf_url'] = None
         else:
             item['pdf_url'] = None 
         

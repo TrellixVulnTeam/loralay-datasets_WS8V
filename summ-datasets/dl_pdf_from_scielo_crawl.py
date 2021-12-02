@@ -15,7 +15,7 @@ def download_pdf_from_crawl(args):
         for line in tqdm(f, total=num_lines):
             item = json.loads(line)
             output_path = os.path.join(args.output_dir, item["doi"] + ".pdf") 
-            if item["pdf_url"] is not None:
+            if "pdf_url" in item and item["pdf_url"] is not None:
                 if extract_pdf(item["pdf_url"], output_path):
                     with open(args.downloaded_log, "a") as fw:
                         fw.write(item["doi"] + "\n")
