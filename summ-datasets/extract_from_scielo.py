@@ -10,7 +10,8 @@ class ScieloSpider(scrapy.Spider):
     name = "scielo_spider"
     custom_settings = {
         'DOWNLOAD_DELAY': 3, # amount of time (in secs) waiting before downloading consecutive pages
-        'FEED_EXPORT_ENCODING': 'utf-8'
+        'FEED_EXPORT_ENCODING': 'utf-8',
+        'LOG_LEVEL': 'INFO',
     }
 
 
@@ -45,7 +46,11 @@ class ScieloSpider(scrapy.Spider):
             if len(date) != 2: # date should be month, year
                 item["date"] = "unknown"
             else:
-                month = date[0].xpath("text()").extract_first().strip()
+                month = date[0].xpath("text()").extract_first()
+                if month is not None:
+                    month = month.strip()
+                else: # no month specified, set to January
+                    month = "jan"
                 year = date[1].xpath("text()").extract_first().strip()[:-1]
                 item["date"] = month + " " + year
 
