@@ -149,7 +149,6 @@ class ScieloSpider(scrapy.Spider):
 
 def crawl_scielo(args):           
     process = CrawlerProcess(settings={
-        'USER_AGENT': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
         "FEEDS": {
             args.output_file: {"format": "jsonlines"}
         }
