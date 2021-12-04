@@ -5,6 +5,7 @@ import argparse
 import os 
 from src.utils import del_file_if_exists
 import json
+import random
 
 class ScieloSpider(scrapy.Spider):
     name = "scielo_spider"
@@ -41,7 +42,7 @@ class ScieloSpider(scrapy.Spider):
                 len(ids_crawled),
             ))
 
-        yield scrapy.Request(self.start_url, meta={'ids_crawled': ids_crawled})
+        yield scrapy.Request(self.start_url, meta={'ids_crawled': ids_crawled}, headers={"User-Agent": random.choice(self.custom_settings['USER_AGENTS'])})
 
     def parse(self, response):
         ITEM_SELECTOR = 'div.results > div.item'
@@ -74,7 +75,7 @@ class ScieloSpider(scrapy.Spider):
                 "doi": doi
             }
 
-            if response.meta["ids_crawled"] is not None and item["id"] in response.meta["ids_crawled"]:
+            if "ids_crawled" in response.meta and response.meta["ids_crawled"] is not None and item["id"] in response.meta["ids_crawled"]:
                 continue 
 
             date = publication.xpath(DATE_SELECTOR)
@@ -110,7 +111,8 @@ class ScieloSpider(scrapy.Spider):
             yield scrapy.Request(
                 response.urljoin(text_url),
                 callback=self.parse_page,
-                meta={'item': item}
+                meta={'item': item},
+                headers={"User-Agent": random.choice(self.custom_settings['USER_AGENTS'])}
             )
 
         if current_page < stop_page: # there are still pages to crawl
@@ -123,7 +125,8 @@ class ScieloSpider(scrapy.Spider):
             next_url = next_url.replace(f"page={current_page}", f"page={next_page}") # increment page number
             yield scrapy.Request(
                 response.urljoin(next_url),
-                callback=self.parse
+                callback=self.parse,
+                headers={"User-Agent": random.choice(self.custom_settings['USER_AGENTS'])}
             )
 
     
