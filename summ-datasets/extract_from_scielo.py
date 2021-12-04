@@ -170,7 +170,12 @@ def crawl_scielo(args):
         
     })
 
-    process.crawl(ScieloSpider, start_url=args.start_url, stop_page=args.stop_page)
+    process.crawl(
+        ScieloSpider, 
+        start_url=args.start_url, 
+        stop_page=args.stop_page,
+        resume_crawl=args.resume_crawl
+    )
     process.start()
 
 if __name__ == "__main__":
