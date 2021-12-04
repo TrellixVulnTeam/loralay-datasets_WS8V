@@ -4,7 +4,7 @@ from scrapy.crawler import CrawlerProcess
 import argparse
 import os 
 from src.utils import del_file_if_exists
-
+import json
 
 class ScieloSpider(scrapy.Spider):
     name = "scielo_spider"
@@ -29,7 +29,19 @@ class ScieloSpider(scrapy.Spider):
 
 
     def start_requests(self):
-        yield scrapy.Request(self.start_url)
+        ids_crawled = None 
+        if self.resume_crawl:
+            ids_crawled = []
+            with open(self.output_file) as f:
+                for line in f:
+                    item = json.loads(line)
+                    ids_crawled.append(item["id"])
+            print("Resuming crawl from {}... Skipping {} publications".format(
+                self.start_urls,
+                len(ids_crawled),
+            ))
+
+        yield scrapy.Request(self.start_url, meta={'ids_crawled': ids_crawled})
 
     def parse(self, response):
         ITEM_SELECTOR = 'div.results > div.item'
@@ -61,6 +73,9 @@ class ScieloSpider(scrapy.Spider):
                 "id": args.collection_prefix + "_" + item_number,
                 "doi": doi
             }
+
+            if response.meta["ids_crawled"] is not None and item["id"] in response.meta["ids_crawled"]:
+                continue 
 
             date = publication.xpath(DATE_SELECTOR)
             if len(date) != 2: # date should be month, year
@@ -186,10 +201,19 @@ if __name__ == "__main__":
         action="store_true", 
         help="Overwrite the output file."
     )
+    parser.add_argument(
+        "--resume_crawl", 
+        action="store_true", 
+    )
 
     args = parser.parse_args()
 
-    if os.path.exists(args.output_file):
+    if args.resume_crawl and args.overwrite_output:
+        raise ValueError(
+            f"Cannot use --resume and --overwrite_output at the same time."
+        )
+
+    if os.path.exists(args.output_file) and not args.resume_crawl:
         if args.overwrite_output:
             del_file_if_exists(args.output_file)
         else:
