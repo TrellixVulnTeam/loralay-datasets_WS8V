@@ -174,7 +174,8 @@ def crawl_scielo(args):
         ScieloSpider, 
         start_url=args.start_url, 
         stop_page=args.stop_page,
-        resume_crawl=args.resume_crawl
+        resume_crawl=args.resume_crawl,
+        output_file=args.output_file
     )
     process.start()
 
