@@ -18,13 +18,13 @@ def download_pdf_from_crawl(args):
             if "pdf_url" in item and item["pdf_url"] is not None:
                 if extract_pdf(item["pdf_url"], output_path):
                     with open(args.downloaded_log, "a") as fw:
-                        fw.write(item["doi"] + "\n")
+                        fw.write(item["id"] + "\n")
                 else:
                     with open(args.not_downloaded_log, "a") as fw:
-                        fw.write(item["doi"] + "\n")
+                        fw.write(item["id"] + "\n")
             else:
                 with open(args.not_downloaded_log, "a") as fw:
-                    fw.write(item["doi"] + "\n")
+                    fw.write(item["id"] + "\n")
                 
             
 

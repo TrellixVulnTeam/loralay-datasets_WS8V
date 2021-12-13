@@ -75,7 +75,7 @@ class ScieloSpider(scrapy.Spider):
                 "doi": doi
             }
 
-            if "ids_crawled" in response.meta and response.meta["ids_crawled"] is not None and item["id"] in response.meta["ids_crawled"]:
+            if response.meta["ids_crawled"] is not None and item["id"] in response.meta["ids_crawled"]:
                 continue 
 
             date = publication.xpath(DATE_SELECTOR)
@@ -126,6 +126,7 @@ class ScieloSpider(scrapy.Spider):
             yield scrapy.Request(
                 response.urljoin(next_url),
                 callback=self.parse,
+                meta=response.meta,
                 headers={"User-Agent": random.choice(self.custom_settings['USER_AGENTS'])}
             )
 
