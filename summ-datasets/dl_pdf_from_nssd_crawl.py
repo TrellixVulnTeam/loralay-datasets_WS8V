@@ -35,13 +35,16 @@ def download_pdf_from_crawl(args):
         for line in tqdm(f, total=num_lines):
             item = json.loads(line)
             output_path = os.path.join(args.output_dir, item["id"] + ".pdf") 
-            if extract_pdf(item["download_link"], output_path, args.cookie):
-                with open(args.downloaded_log, "a") as fw:
+            if len(item["download_link"]) > 0:
+                if extract_pdf(item["download_link"], output_path, args.cookie):
+                    with open(args.downloaded_log, "a") as fw:
+                            fw.write(item["id"] + "\n")
+                else:
+                    with open(args.not_downloaded_log, "a") as fw:
                         fw.write(item["id"] + "\n")
             else:
                 with open(args.not_downloaded_log, "a") as fw:
                     fw.write(item["id"] + "\n")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
