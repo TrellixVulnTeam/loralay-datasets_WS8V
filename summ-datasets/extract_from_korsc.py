@@ -119,7 +119,8 @@ class KoreaScienceSpider(scrapy.Spider):
         item = response.meta['item']
 
         PDF_URL_SELECTOR = './/div[@class="contents-table"]/a/@href'
-        ABSTRACTS_SELECTOR = './/div[@class="article-box" and h4[contains(text(), "Abstract")]]/p/text()'
+        # ABSTRACTS_SELECTOR = './/div[@class="article-box" and h4[contains(text(), "Abstract")]]/p/text()'
+        ABSTRACTS_SELECTOR = './/div[@class="article-box" and h4[contains(text(), "Abstract")]]/p'
         KEYWORDS_SELECTOR = './/div[@class="article-box" and h4[contains(text(), "Keywords")]]/ul/li/a/text()'
 
         pdf_url = response.xpath(PDF_URL_SELECTOR).extract_first()
@@ -128,15 +129,26 @@ class KoreaScienceSpider(scrapy.Spider):
         else:
             item["pdf_url"] = ""
 
-        all_abstracts = response.xpath(ABSTRACTS_SELECTOR).extract()
+        # all_abstracts = response.xpath(ABSTRACTS_SELECTOR).extract()
+        all_abstracts = response.xpath(ABSTRACTS_SELECTOR)
 
-        for abstract in all_abstracts:
-            abstract = abstract.strip()
+        for p_abstract in all_abstracts:
+            abstract_list = p_abstract.xpath("./text()").extract()
+            abstract_list = [sub_abstract.strip() for sub_abstract in abstract_list]
+            abstract = " ".join(abstract_list)
             try:
                 lang_abstract = langdetect.detect(abstract)
                 item["abstract_" + lang_abstract] = abstract
             except langdetect.lang_detect_exception.LangDetectException:
                 print(f"Unable to detect language for {abstract} ({response.url})")
+
+        # for abstract in all_abstracts:
+        #     abstract = abstract.strip()
+        #     try:
+        #         lang_abstract = langdetect.detect(abstract)
+        #         item["abstract_" + lang_abstract] = abstract
+        #     except langdetect.lang_detect_exception.LangDetectException:
+        #         print(f"Unable to detect language for {abstract} ({response.url})")
 
         keywords = response.xpath(KEYWORDS_SELECTOR).extract()
         if len(keywords) > 0:
