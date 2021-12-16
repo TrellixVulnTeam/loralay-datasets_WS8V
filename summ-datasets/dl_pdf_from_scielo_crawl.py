@@ -7,6 +7,8 @@ from src.utils import (
     overwrite_dir_if_exists,
     extract_pdf,
 )
+import random 
+import time
 
 def download_pdf_from_crawl(args):
     num_lines = sum(1 for line in open(args.input_file,'r'))
@@ -21,6 +23,7 @@ def download_pdf_from_crawl(args):
                 else:
                     with open(args.not_downloaded_log, "a") as fw:
                         fw.write(item["id"] + "\n")
+                time.sleep(random.uniform(0.5, 1) * 1.5)
             else:
                 with open(args.not_downloaded_log, "a") as fw:
                     fw.write(item["id"] + "\n")
