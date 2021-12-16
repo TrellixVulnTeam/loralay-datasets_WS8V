@@ -39,7 +39,8 @@ def extract_pdf(url, output_path):
     Returns:
         bool: True if extraction was successful, False otherwise
     """
-    command = f"wget -w 3 --random-wait -q -O {output_path} {url}"
+    # command = f"wget -w 3 --random-wait -q -O {output_path} {url}"
+    command = f"wget -w 3 --random-wait -O {output_path} '{url}'"
     subprocess.call(command, shell=True)
     
     if os.path.exists(output_path):

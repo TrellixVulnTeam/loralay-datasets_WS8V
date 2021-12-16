@@ -23,7 +23,10 @@ def download_pdf_from_crawl(args):
                 else:
                     with open(args.not_downloaded_log, "a") as fw:
                         fw.write(item["id"] + "\n")
-                time.sleep(random.uniform(0.5, 1) * 1.5)
+                waiting_time = random.uniform(0.5, 1.5) * 5
+                print(f"Waiting {waiting_time} seconds")
+                time.sleep(waiting_time)
+
             else:
                 with open(args.not_downloaded_log, "a") as fw:
                     fw.write(item["id"] + "\n")
