@@ -7,7 +7,6 @@ from src.utils import (
     overwrite_dir_if_exists,
     extract_pdf,
 )
-import time
 
 def download_pdf_from_crawl(args):
     num_lines = sum(1 for line in open(args.input_file,'r'))
