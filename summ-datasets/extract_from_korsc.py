@@ -122,6 +122,8 @@ class KoreaScienceSpider(scrapy.Spider):
         # ABSTRACTS_SELECTOR = './/div[@class="article-box" and h4[contains(text(), "Abstract")]]/p/text()'
         ABSTRACTS_SELECTOR = './/div[@class="article-box" and h4[contains(text(), "Abstract")]]/p'
         KEYWORDS_SELECTOR = './/div[@class="article-box" and h4[contains(text(), "Keywords")]]/ul/li/a/text()'
+        PUBLICATION_DATE = './/ul[@class="list-inline"]/li[@class="list-inline-item" and contains(text(), "Published")]/text()'
+        DOI_SELECTOR = './/a[@class="btn btn-link pl0"]/@href'
 
         pdf_url = response.xpath(PDF_URL_SELECTOR).extract_first()
         if pdf_url is not None:
@@ -155,6 +157,13 @@ class KoreaScienceSpider(scrapy.Spider):
             item["keywords"] = keywords
         else:
             item["keywords"] = None 
+
+        publication_date = response.xpath(PUBLICATION_DATE).extract_first()
+        if publication_date is not None:
+            publication_date = publication_date.replace("Published : ", "")
+        
+        item["publication_date"] = publication_date
+        item["doi"] = response.xpath(DOI_SELECTOR).extract_first()
 
         return item
 
