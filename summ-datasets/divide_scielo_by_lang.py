@@ -13,6 +13,9 @@ def divide(args):
     with open(args.abstract_file, "r") as f:
         for line in tqdm(f, total=num_lines):
             item = json.loads(line)
+            if not os.path.exists(os.path.join(args.input_folder, item["id"] + ".pdf")):
+                print(f"Publication {item['id']} does not have a PDF file.")
+                continue 
             if item["pdf_lang"] == "es":
                 lang = "es"
                 num_es += 1
