@@ -58,7 +58,7 @@ class KoreaScienceSpider(scrapy.Spider):
                 r"(\d+|[0-9]{1,3},[0-9]{3}) \/ (\d+|[0-9]{1,3},[0-9]{3}) pages", 
                 page_counter
             )
-            current_page = int(matches.group(1))
+            current_page = int(matches.group(1).replace(",", ""))
             total_num_pages = int(matches.group(2).replace(",", ""))
             stop_page = self.stop_page if self.stop_page > 0 else total_num_pages
         else: # Last page 
@@ -129,7 +129,7 @@ class KoreaScienceSpider(scrapy.Spider):
         if pdf_url is not None:
             item["pdf_url"] = "http://koreascience.or.kr" + pdf_url 
         else:
-            item["pdf_url"] = ""
+            item["pdf_url"] = "" # todo: standardize: either None or empty string
 
         # all_abstracts = response.xpath(ABSTRACTS_SELECTOR).extract()
         all_abstracts = response.xpath(ABSTRACTS_SELECTOR)
@@ -189,11 +189,6 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--start_url",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "--collection_prefix",
         type=str,
         required=True,
     )
