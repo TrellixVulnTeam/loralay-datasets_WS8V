@@ -19,7 +19,7 @@ def count_num_pages_from_pdf(input_folder):
             with open(fpath, 'rb') as pdf_file:
                 pdf_reader = PdfFileReader(pdf_file, strict=False)
                 all_num_pages.append(pdf_reader.numPages)
-        except (PyPDF2.utils.PdfReadError, OSError, KeyError, ValueError, TypeError):
+        except (PyPDF2.utils.PdfReadError, OSError, KeyError, ValueError, TypeError, AssertionError):
             continue 
 
     return all_num_pages
