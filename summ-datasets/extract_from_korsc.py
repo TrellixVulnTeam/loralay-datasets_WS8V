@@ -119,7 +119,6 @@ class KoreaScienceSpider(scrapy.Spider):
         item = response.meta['item']
 
         PDF_URL_SELECTOR = './/div[@class="contents-table"]/a/@href'
-        # ABSTRACTS_SELECTOR = './/div[@class="article-box" and h4[contains(text(), "Abstract")]]/p/text()'
         ABSTRACTS_SELECTOR = './/div[@class="article-box" and h4[contains(text(), "Abstract")]]/p'
         KEYWORDS_SELECTOR = './/div[@class="article-box" and h4[contains(text(), "Keywords")]]/ul/li/a/text()'
         PUBLICATION_DATE = './/ul[@class="list-inline"]/li[@class="list-inline-item" and contains(text(), "Published")]/text()'
@@ -131,7 +130,6 @@ class KoreaScienceSpider(scrapy.Spider):
         else:
             item["pdf_url"] = "" # todo: standardize: either None or empty string
 
-        # all_abstracts = response.xpath(ABSTRACTS_SELECTOR).extract()
         all_abstracts = response.xpath(ABSTRACTS_SELECTOR)
 
         for p_abstract in all_abstracts:
@@ -143,14 +141,6 @@ class KoreaScienceSpider(scrapy.Spider):
                 item["abstract_" + lang_abstract] = abstract
             except langdetect.lang_detect_exception.LangDetectException:
                 print(f"Unable to detect language for {abstract} ({response.url})")
-
-        # for abstract in all_abstracts:
-        #     abstract = abstract.strip()
-        #     try:
-        #         lang_abstract = langdetect.detect(abstract)
-        #         item["abstract_" + lang_abstract] = abstract
-        #     except langdetect.lang_detect_exception.LangDetectException:
-        #         print(f"Unable to detect language for {abstract} ({response.url})")
 
         keywords = response.xpath(KEYWORDS_SELECTOR).extract()
         if len(keywords) > 0:
