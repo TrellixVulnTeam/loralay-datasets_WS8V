@@ -25,7 +25,6 @@ def count_num_words(abstract_file, abstract_key, input_folder=None, file_extensi
                 all_sum_length.append(abstract_length)
                 len_valid += 1
 
-
     return all_sum_length
 
 def get_stats(args):
@@ -55,7 +54,7 @@ def get_stats(args):
         plt.title(f'Histogram of summary length ({args.dataset_name})')
         plt.grid(True)
         plt.tight_layout()
-        plt.savefig(args.output_hist, dpi=300)
+        plt.savefig(args.output_hist_fname, dpi=300)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -85,7 +84,7 @@ if __name__ == "__main__":
         action="store_true", 
     )
     parser.add_argument(
-        "--output_hist",
+        "--output_hist_fname",
         type=str,
     )
     parser.add_argument(

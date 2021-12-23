@@ -16,12 +16,11 @@ def _is_valid_pdf(filepath, max_pages):
         with open(filepath, "rb") as pdf_file:
             pdf_reader = PdfFileReader(pdf_file, strict=False)
             num_pages = pdf_reader.numPages
-            if max_pages > 0 and num_pages > max_pages: 
-                return False 
-            else:
-                return True 
-    except (PyPDF2.utils.PdfReadError, OSError):
-        print(filepath)
+        if max_pages > 0 and num_pages > max_pages: 
+            return False 
+        else:
+            return True 
+    except (PyPDF2.utils.PdfReadError, OSError, ValueError):
         return False 
 
 def pdf2flowhtml(
@@ -35,9 +34,12 @@ def pdf2flowhtml(
     max_pages: int,
 ) -> str:
 
-    filepath = os.path.join(
-        os.path.join(input_dir, pdf_folder), filename
-    )
+    if use_docker:
+        filepath = os.path.join(
+            os.path.join(input_dir, pdf_folder), filename
+        )
+    else:
+        filepath = os.path.join(pdf_folder, filename)
     if not _is_valid_pdf(filepath, max_pages=max_pages):
         return False
 
@@ -77,6 +79,7 @@ def convert(args):
         fnames = remove_processed_from_id_list(
             fnames, args.converted_output_log
         )
+        fnames = fnames[1:]
         if not fnames:
             print(f"All documents in {pdf_path} have already been converted to HTML")
             return

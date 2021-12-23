@@ -59,13 +59,14 @@ def get_stats(args):
     print("\t95-th percentile: ", quantile_95)
     print("\t99-th percentile: ", quantile_99)
 
-    # plt.hist(all_num_pages, bins=30)
-    # plt.xlabel('Number of pages')
-    # plt.ylabel('Counts')
-    # plt.title(args.dataset_name)
-    # plt.grid(True)
-    # plt.tight_layout()
-    # plt.savefig(args.output_hist, dpi=300)
+    if args.plot_hist:
+        plt.hist(all_num_pages, bins=30)
+        plt.xlabel('Number of pages')
+        plt.ylabel('Counts')
+        plt.title(args.dataset_name)
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(args.output_hist_fname, dpi=300)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -80,16 +81,20 @@ if __name__ == "__main__":
         type=str,
         required=True,
     )
-    # parser.add_argument(
-    #     "--dataset_name",
-    #     type=str,
-    #     required=True,
-    # )
-    # parser.add_argument(
-    #     "--output_hist",
-    #     type=str,
-    #     required=True,
-    # )
+    parser.add_argument(
+        "--plot_hist", 
+        action="store_true", 
+    )
+    parser.add_argument(
+        "--dataset_name",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "--output_hist_fname",
+        type=str,
+        required=True,
+    )
 
     args = parser.parse_args()
 

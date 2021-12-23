@@ -10,6 +10,11 @@ from src.utils import (
     overwrite_dir_if_exists,
     extract_pdf
 )
+import langdetect
+from langdetect import DetectorFactory
+
+DetectorFactory.seed = 0
+
 
 def get_last_idx(downloaded_log, failed_log):
     """ Get last index processed
@@ -59,6 +64,15 @@ def extract(args):
         docid = str(item["docid"])
         if args.lang + "_abstract_s" in item and "files_s" in item:
             abstract_text = item[args.lang + "_abstract_s"][0].replace("\n", " ")  
+
+            if abstract_text is not None:
+                try:
+                    lang_abstract = langdetect.detect(abstract_text)
+                    if lang_abstract != "fr":
+                        abstract_text = None
+                except langdetect.lang_detect_exception.LangDetectException:
+                    abstract_text = None 
+
             if abstract_text is not None:    
                 pdf_output_path = os.path.join(args.pdf_output_dir, docid + ".pdf")        
 
@@ -75,7 +89,7 @@ def extract(args):
         else:
             with open(args.abstract_output_path, "a") as fw:
                 json.dump(
-                    {"id": docid, "abstract": abstract_text}, fw
+                    {"id": docid, "abstract": abstract_text}, fw, ensure_ascii=False
                 )
                 fw.write('\n')
             with open(args.downloaded_output_log, "a") as f:

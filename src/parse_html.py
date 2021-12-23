@@ -129,7 +129,7 @@ def parse(args):
             print(f"All documents in {args.input_file} have already been parsed")
             return
 
-    for html in tqdm(fnames):
+    for html in tqdm(fnames, desc=f"Parsing HTMLs from {args.html_dir}"):
         html_path = os.path.join(args.html_dir, html)
         doc = extract_text_from_tree(
             html_path, args.lang, do_normalize_bbox=args.do_normalize_bbox, remove_ref=args.remove_ref
