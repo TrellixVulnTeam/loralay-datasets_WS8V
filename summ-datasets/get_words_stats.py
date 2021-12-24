@@ -54,7 +54,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_name",
         type=str,
-        required=True,
     )
     parser.add_argument(
         "--plot_hist", 
@@ -63,7 +62,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output_hist_fname",
         type=str,
-        required=True,
     )
 
     args = parser.parse_args()

@@ -60,7 +60,7 @@ def get_stats(args):
     print("\t99-th percentile: ", quantile_99)
 
     if args.plot_hist:
-        plt.hist(all_num_pages, bins=30)
+        plt.hist(all_num_pages)
         plt.xlabel('Number of pages')
         plt.ylabel('Counts')
         plt.title(args.dataset_name)
@@ -88,12 +88,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_name",
         type=str,
-        required=True,
     )
     parser.add_argument(
         "--output_hist_fname",
         type=str,
-        required=True,
     )
 
     args = parser.parse_args()
