@@ -5,50 +5,58 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+from konlpy.tag import Hannanum
 
-
-def count_num_words(abstract_file, abstract_key, input_folder=None, file_extension=None):
-    # input_files = os.listdir(input_folder)
+def get_abs_length(
+    abstract_file, 
+    abstract_key, 
+    input_folder=None, 
+    file_extension=None,
+):
     if input_folder is not None and file_extension is not None:
         input_files = list(Path(input_folder).rglob(f"*.{file_extension}"))
         valid_ids = [os.path.basename(os.path.normpath(fname))[:-(len(file_extension)+1)] for fname in input_files]
 
-    all_sum_length = []
+    all_abs_length = []
     len_valid = 0
+    hannanum = Hannanum()
 
     num_lines = sum(1 for line in open(abstract_file,'r'))
     with open(abstract_file, 'r', encoding='utf-8') as f:
         for line in tqdm(f, total=num_lines):
             item = json.loads(line)
             if input_folder is None or (item["id"] in valid_ids and abstract_key in item.keys()):
-                abstract_length = len(item[abstract_key].split())
-                all_sum_length.append(abstract_length)
+                if abstract_key != 'abstract_ko':
+                    abstract_length = len(item[abstract_key].split())
+                else:
+                    abstract_length = len(hannanum.morphs(item[abstract_key]))
+                all_abs_length.append(abstract_length)
                 len_valid += 1
 
-    return all_sum_length
+    return all_abs_length
 
 def get_stats(args):
-    all_sum_length = count_num_words(
+    all_abs_length = get_abs_length(
         args.abstract_file, 
         args.abstract_key, 
         input_folder=args.input_folder,
-        file_extension=args.file_extension
+        file_extension=args.file_extension,
     )
 
     print(f"Stats for summary length in {args.abstract_file}")
-    print("\tMin summary length: ", min(all_sum_length))
-    print("\tMax summary length: ", max(all_sum_length))
-    print("\tAvg summary length: ", round(np.mean(all_sum_length)))
-    print("\tMedian summary length: ", round(np.median(all_sum_length)))
+    print("\tMin summary length: ", min(all_abs_length))
+    print("\tMax summary length: ", max(all_abs_length))
+    print("\tAvg summary length: ", round(np.mean(all_abs_length)))
+    print("\tMedian summary length: ", round(np.median(all_abs_length)))
 
-    quantile_5 = np.quantile(all_sum_length, q=0.05)
-    quantile_1 = np.quantile(all_sum_length, q=0.01)
+    quantile_5 = np.quantile(all_abs_length, q=0.05)
+    quantile_1 = np.quantile(all_abs_length, q=0.01)
     print("\t5-th percentile: ", quantile_5)
     print("\t1st percentile: ", quantile_1)
 
 
     if args.plot_hist:
-        plt.hist(all_sum_length, bins=30, facecolor='g')
+        plt.hist(all_abs_length, bins=30, facecolor='g')
         plt.xlabel('Number of words')
         plt.ylabel('Counts')
         plt.title(f'Histogram of summary length ({args.dataset_name})')
