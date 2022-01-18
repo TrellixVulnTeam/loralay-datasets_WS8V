@@ -29,6 +29,10 @@ def get_stats(args):
     print("\tMedian # words: ", round(np.median(all_num_words)))
     print("\tTotal # words: ", round(np.sum(all_num_words)))
 
+    quantile_1 = np.quantile(all_num_words, q=0.01)
+    quantile_5 = np.quantile(all_num_words, q=0.05)
+    print("\t1st percentile: ", quantile_1)
+    print("\t5-th percentile: ", quantile_5)
     quantile_95 = np.quantile(all_num_words, q=0.95)
     quantile_99 = np.quantile(all_num_words, q=0.99)
     print("\t95-th percentile: ", quantile_95)

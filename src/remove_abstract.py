@@ -69,11 +69,16 @@ def find_abstract_span(text, abstract_text, max_l_dist=15):
     return None 
 
 
-def _update_and_save_txt(out_txt_path, in_txt_path, start_stop_indices):
+def _update_and_save_txt(in_txt_path, out_txt_path, start_stop_indices):
     with open(out_txt_path, "w") as fw:
         with open(in_txt_path, "r") as f:
             for i, line in enumerate(f):
-                if i < start_stop_indices[0] or i > start_stop_indices[1]:
+                in_abstract = False 
+                for (start, stop) in start_stop_indices:
+                    if i >= start and i <= stop:
+                        in_abstract = True
+                        break 
+                if not in_abstract:
                     fw.write(line)
 
 
@@ -151,6 +156,8 @@ def find_and_remove(args):
             if doc_id not in input_doc_ids:
                 continue 
 
+            if doc_id not in remaining_files:
+                print(doc_id)
             remaining_files.remove(doc_id)
 
             doc_txt_path = os.path.join(args.text_dir, doc_id + ".txt")
@@ -165,6 +172,13 @@ def find_and_remove(args):
             elif "abstract_" + args.main_lang in item.keys():
                 all_abstracts = [abstract for key, abstract in item.items() if key.startswith("abstract_")]
                 main_abstract = item["abstract_" + args.main_lang]
+
+                ### DEBUGGING
+                if len(all_abstracts) == 1: # only one abstract, in main language
+                    shutil.copy(doc_txt_path, doc_out_txt_path)
+                    continue 
+                ###
+
             else:
                 continue # no abstract written in main language, skip
 
@@ -233,33 +247,39 @@ def find_and_remove(args):
                             )
                             all_abstracts_page[lang_idx] = (curr_page_num, curr_page)
 
-            if all(all_abstracts_found):
-                for lang_idx in range(len(all_abstracts)):
-                    page_num, page = all_abstracts_page[lang_idx]
-                    abstract_start_stop_indices = all_abstracts_start_stop_indices[lang_idx]
-                    bboxes = [line[1:5] for line in page]
-                    pdf_size = (int(page[0][5]), int(page[0][6]))
+            ### DEBUGGING ###
+            all_abstracts_start_stop_indices = [indices for indices in all_abstracts_start_stop_indices if indices is not None]
+            _update_and_save_txt(doc_txt_path, doc_out_txt_path, all_abstracts_start_stop_indices)
+            ###
 
-                    _update_and_save_txt(
-                        doc_out_txt_path, doc_txt_path, abstract_start_stop_indices
-                    )
-                    if args.img_dir is not None:
-                        _update_and_save_img(
-                            doc_id, 
-                            img_tar, 
-                            page_num, 
-                            abstract_start_stop_indices, 
-                            pdf_size,
-                            bboxes,
-                            args.output_img_dir,
-                            doc_out_img_tar 
-                        )
+            # if all(all_abstracts_found):
+            #     _update_and_save_txt(doc_txt_path, doc_out_txt_path, all_abstracts_start_stop_indices)
+            #     # for lang_idx in range(len(all_abstracts)):
+            #     #     page_num, page = all_abstracts_page[lang_idx]
+            #     #     abstract_start_stop_indices = all_abstracts_start_stop_indices[lang_idx]
+            #     #     bboxes = [line[1:5] for line in page]
+            #     #     pdf_size = (int(page[0][5]), int(page[0][6]))
 
-                with open(args.found_output_log, "a") as f:
-                    f.write(doc_id + "\n")
-            else:
-                with open(args.failed_output_log, "a") as f:
-                    f.write(doc_id + "\n")
+            #     #     _update_and_save_txt(
+            #     #         doc_out_txt_path, doc_txt_path, abstract_start_stop_indices
+            #     #     )
+            #     #     if args.img_dir is not None:
+            #     #         _update_and_save_img(
+            #     #             doc_id, 
+            #     #             img_tar, 
+            #     #             page_num, 
+            #     #             abstract_start_stop_indices, 
+            #     #             pdf_size,
+            #     #             bboxes,
+            #     #             args.output_img_dir,
+            #     #             doc_out_img_tar 
+            #     #         )
+
+            #     with open(args.found_output_log, "a") as f:
+            #         f.write(doc_id + "\n")
+            # else:
+            #     with open(args.failed_output_log, "a") as f:
+            #         f.write(doc_id + "\n")
 
     for doc_id in tqdm(remaining_files):
         shutil.copyfile(

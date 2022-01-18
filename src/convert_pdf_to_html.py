@@ -20,7 +20,7 @@ def _is_valid_pdf(filepath, max_pages):
             return False 
         else:
             return True 
-    except (PyPDF2.utils.PdfReadError, OSError, ValueError):
+    except (PyPDF2.utils.PdfReadError, OSError, ValueError, AssertionError):
         return False 
 
 def pdf2flowhtml(
