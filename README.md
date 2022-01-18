@@ -10,9 +10,9 @@ $ cd summ-datasets
 $ pip install -r requirements.txt
 ~~~
 
-## Extract PDF files 
+## 1. Extract PDF files 
 
-### From ArXiv and PubMed datasets
+### a) From ArXiv and PubMed datasets
 
 PDFs are extracted based on IDs contained in the original data files (downloaded from https://github.com/armancohan/long-summarization). 
 
@@ -36,7 +36,7 @@ $ python src/extract_from_pubmed.py --input_file path/to/original/data/file \
                                     --n_docs <num_docs_to_process> # -1 to process every document
 ~~~
 
-### From HAL
+### b) From HAL
 
 We extract French articles from HAL using the provided API.
 
@@ -47,7 +47,7 @@ $ python src/extract_from_hal.py --lang fr \
                                  --n_docs <num_docs_to_process> # -1 to process every document
 ~~~
 
-### From SciELO and KoreaScience
+### c) From SciELO and KoreaScience
 
 We extract PDFs from SciELO and KoreaScience by scraping their websites.
 
@@ -70,7 +70,7 @@ $ python src/extract_from_korsc.py \
     --stop_page <num_pages_to_process> # -1 to process every page
 ~~~
 
-## Convert PDFs to images
+## 2. Convert PDFs to images
 
 ~~~shell
 $ python src/convert_pdf_to_image.py --input_dir path/to/pdf/dir \
@@ -78,7 +78,7 @@ $ python src/convert_pdf_to_image.py --input_dir path/to/pdf/dir \
                                      --n_docs <num_docs_to_process> # -1 to process     every document
 ~~~
 
-## Convert PDFs to HTMLs
+## 3. Convert PDFs to HTMLs
 
 ~~~shell
 $ python src/convert_pdf_to_html.py --input_dir path/to/dir/containing/pdf/folder \
@@ -87,7 +87,7 @@ $ python src/convert_pdf_to_html.py --input_dir path/to/dir/containing/pdf/folde
                                     --n_docs <num_docs_to_process>  # -1 to process every document
 ~~~
 
-## Convert HTMLs to txt
+## 4. Convert HTMLs to txt
 
 ~~~shell
 $ python src/parse_html.py --html_dir path/to/html/dir \
@@ -95,7 +95,7 @@ $ python src/parse_html.py --html_dir path/to/html/dir \
                            --n_docs num_docs_to_process # -1 to process every document
 ~~~
 
-## Find and remove abstract from text files 
+## 5. Find and remove abstract from text files 
 
 ~~~
 $ python src/remove_abstract.py --text_dir path/to/txt/dir \
