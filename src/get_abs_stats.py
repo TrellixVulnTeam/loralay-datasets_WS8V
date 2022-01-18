@@ -5,7 +5,6 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from konlpy.tag import Hannanum
 
 def get_abs_length(
     abstract_file, 
@@ -19,17 +18,13 @@ def get_abs_length(
 
     all_abs_length = []
     len_valid = 0
-    hannanum = Hannanum()
 
     num_lines = sum(1 for line in open(abstract_file,'r'))
     with open(abstract_file, 'r', encoding='utf-8') as f:
         for line in tqdm(f, total=num_lines):
             item = json.loads(line)
             if input_folder is None or (item["id"] in valid_ids and abstract_key in item.keys()):
-                if abstract_key != 'abstract_ko':
-                    abstract_length = len(item[abstract_key].split())
-                else:
-                    abstract_length = len(hannanum.morphs(item[abstract_key]))
+                abstract_length = len(item[abstract_key].split())
                 all_abs_length.append(abstract_length)
                 len_valid += 1
 

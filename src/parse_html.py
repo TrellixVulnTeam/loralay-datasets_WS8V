@@ -43,7 +43,7 @@ def skip_first_page(page):
 
     return False
 
-def extract_text_from_tree(file_path, lang, do_normalize_bbox=False, remove_ref=False):
+def extract_text_from_tree(file_path, do_normalize_bbox=False, remove_ref=False):
     doc = []
 
     cur_page = []
@@ -81,10 +81,6 @@ def extract_text_from_tree(file_path, lang, do_normalize_bbox=False, remove_ref=
                         bbox = tuple([xmin, ymin, xmax, ymax])
                         if do_normalize_bbox:
                             bbox = normalize_bbox(bbox, (page_width, page_height))
-
-                        if remove_ref and word.lower() in REF_MAPPING[lang]:
-                            ref_page_idx = len(doc) 
-                            ref_start_idx_in_page = len(cur_page)
 
                         cur_page.append((word,) + bbox + (page_width, page_height))
 
@@ -132,7 +128,7 @@ def parse(args):
     for html in tqdm(fnames, desc=f"Parsing HTMLs from {args.html_dir}"):
         html_path = os.path.join(args.html_dir, html)
         doc = extract_text_from_tree(
-            html_path, args.lang, do_normalize_bbox=args.do_normalize_bbox, remove_ref=args.remove_ref
+            html_path, do_normalize_bbox=args.do_normalize_bbox, remove_ref=args.remove_ref
         )
         doc_id = html.replace(".html", "")
 
@@ -189,10 +185,6 @@ if __name__ == "__main__":
         "--output_dir",
         type=str,
         required=True,
-    )
-    parser.add_argument(
-        "--lang",
-        type=str,
     )
     parser.add_argument(
         "--remove_ref",
