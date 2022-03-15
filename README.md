@@ -1,4 +1,4 @@
-# Summarization datasets with layout information
+# LoRaLay: A Multilingual and Multimodal Dataset for *Lo*ng *Ra*nge and *Lay*out-Aware Summarization
 
 ## Environment Setup 
 
