@@ -70,15 +70,8 @@ $ python src/extract_from_korsc.py \
     --stop_page <num_pages_to_process> # -1 to process every page
 ~~~
 
-## 2. Convert PDFs to images
 
-~~~shell
-$ python src/convert_pdf_to_image.py --input_dir path/to/pdf/dir \
-                                     --output_dir path/to/img/dir \
-                                     --n_docs <num_docs_to_process> # -1 to process     every document
-~~~
-
-## 3. Convert PDFs to HTMLs
+## 2. Convert PDFs to HTMLs
 
 ~~~shell
 $ python src/convert_pdf_to_html.py --input_dir path/to/dir/containing/pdf/folder \
@@ -87,7 +80,7 @@ $ python src/convert_pdf_to_html.py --input_dir path/to/dir/containing/pdf/folde
                                     --n_docs <num_docs_to_process>  # -1 to process every document
 ~~~
 
-## 4. Convert HTMLs to txt
+## 3. Convert HTMLs to txt
 
 ~~~shell
 $ python src/parse_html.py --html_dir path/to/html/dir \
@@ -95,7 +88,7 @@ $ python src/parse_html.py --html_dir path/to/html/dir \
                            --n_docs num_docs_to_process # -1 to process every document
 ~~~
 
-## 5. Find and remove abstract from text files 
+## 4. Find and remove abstract from text files 
 
 ~~~
 $ python src/remove_abstract.py --text_dir path/to/txt/dir \
