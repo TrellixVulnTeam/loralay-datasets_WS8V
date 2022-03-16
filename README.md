@@ -3,9 +3,9 @@
 ## Environment Setup 
 
 ~~~shell
-$ conda create -n di-benchmark python=3.8
+$ conda create -n loralay-datasets python=3.8
 $ conda activate summ-datasets 
-$ git clone ssh://git@source.recital.ai:2222/research/doc-intelligence/summ-datasets.git
+$ git clone https://github.com/laudao/loralay-datasets.git
 $ cd summ-datasets
 $ pip install -r requirements.txt
 ~~~
